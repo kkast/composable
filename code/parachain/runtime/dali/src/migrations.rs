@@ -30,7 +30,10 @@ pub mod hard_coded_assets {
 		currency::Rational64,
 		rational,
 	};
-	use frame_support::WeakBoundedVec;
+	use frame_support::{
+		traits::{GetStorageVersion, StorageVersion},
+		WeakBoundedVec,
+	};
 
 	use primitives::topology;
 	use xcm::latest::prelude::*;
@@ -155,110 +158,118 @@ pub mod hard_coded_assets {
 
 	impl OnRuntimeUpgrade for HardCodedAssetsMigration {
 		fn on_runtime_upgrade() -> Weight {
-			let assets = vec![
-				AssetCreationInput::new_asset(
-					CurrencyId(1),
-					None,
-					"Picasso".as_bytes().to_vec(),
-					"PICA".as_bytes().to_vec(),
-					12,
-					100_000_000_000,
-					None,
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(4),
-					Some(XcmAssetLocation(MultiLocation::parent())),
-					"Kusama".as_bytes().to_vec(),
-					"KSM".as_bytes().to_vec(),
-					12,
-					37_500_000,
-					Some(rational!(375 / 1_000_000)),
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(105),
-					None,
-					"KSM USDT LPT".as_bytes().to_vec(),
-					"KSM_USDT_LPT".as_bytes().to_vec(),
-					12,
-					100,
-					None,
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(106),
-					None,
-					"PICA USDT LPT".as_bytes().to_vec(),
-					"PICA_USDT_LPT".as_bytes().to_vec(),
-					12,
-					100,
-					None,
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(107),
-					None,
-					"PICA KSM LPT".as_bytes().to_vec(),
-					"PICA_KSM_LPT".as_bytes().to_vec(),
-					12,
-					100,
-					None,
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(129),
-					Some(XcmAssetLocation(MultiLocation {
-						parents: 1,
-						interior: X2(
-							Parachain(topology::karura::ID),
-							GeneralKey(WeakBoundedVec::force_from(
-								topology::karura::AUSD_KEY.to_vec(),
-								None,
-							)),
-						),
-					})),
-					"Karura Dollar".as_bytes().to_vec(),
-					"kUSD".as_bytes().to_vec(),
-					12,
-					100_000_000,
-					Some(rational!(15 / 1_000)),
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(130),
-					Some(XcmAssetLocation(MultiLocation {
-						parents: 1,
-						interior: X3(
-							Parachain(topology::common_good_assets::ID),
-							PalletInstance(topology::common_good_assets::ASSETS),
-							GeneralIndex(topology::common_good_assets::USDT),
-						),
-					})),
-					"Tether".as_bytes().to_vec(),
-					"USDT".as_bytes().to_vec(),
-					6,
-					100,
-					Some(rational!(15 / 1_000_000_000)),
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(5),
-					Some(XcmAssetLocation(MultiLocation {
-						parents: 0,
-						interior: X1(GeneralIndex(5)),
-					})),
-					"PBLO".as_bytes().to_vec(),
-					"PBLO".as_bytes().to_vec(),
-					12,
-					100_000_000_000,
-					Some(rational!(1 / 1)),
-				),
-				AssetCreationInput::new_asset(
-					CurrencyId(6),
-					None,
-					"ibcDOT".as_bytes().to_vec(),
-					"ibcDOT".as_bytes().to_vec(),
-					12,
-					214_300_000,
-					None,
-				),
-			];
+			let on_chain_version =
+				<AssetsRegistry as GetStorageVersion>::on_chain_storage_version();
+			if on_chain_version < 1 {
+				let assets = vec![
+					AssetCreationInput::new_asset(
+						CurrencyId(1),
+						None,
+						"Picasso".as_bytes().to_vec(),
+						"PICA".as_bytes().to_vec(),
+						12,
+						100_000_000_000,
+						None,
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(4),
+						Some(XcmAssetLocation(MultiLocation::parent())),
+						"Kusama".as_bytes().to_vec(),
+						"KSM".as_bytes().to_vec(),
+						12,
+						37_500_000,
+						Some(rational!(375 / 1_000_000)),
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(105),
+						None,
+						"KSM USDT LPT".as_bytes().to_vec(),
+						"KSM_USDT_LPT".as_bytes().to_vec(),
+						12,
+						100,
+						None,
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(106),
+						None,
+						"PICA USDT LPT".as_bytes().to_vec(),
+						"PICA_USDT_LPT".as_bytes().to_vec(),
+						12,
+						100,
+						None,
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(107),
+						None,
+						"PICA KSM LPT".as_bytes().to_vec(),
+						"PICA_KSM_LPT".as_bytes().to_vec(),
+						12,
+						100,
+						None,
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(129),
+						Some(XcmAssetLocation(MultiLocation {
+							parents: 1,
+							interior: X2(
+								Parachain(topology::karura::ID),
+								GeneralKey(WeakBoundedVec::force_from(
+									topology::karura::AUSD_KEY.to_vec(),
+									None,
+								)),
+							),
+						})),
+						"Karura Dollar".as_bytes().to_vec(),
+						"kUSD".as_bytes().to_vec(),
+						12,
+						100_000_000,
+						Some(rational!(15 / 1_000)),
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(130),
+						Some(XcmAssetLocation(MultiLocation {
+							parents: 1,
+							interior: X3(
+								Parachain(topology::common_good_assets::ID),
+								PalletInstance(topology::common_good_assets::ASSETS),
+								GeneralIndex(topology::common_good_assets::USDT),
+							),
+						})),
+						"Tether".as_bytes().to_vec(),
+						"USDT".as_bytes().to_vec(),
+						6,
+						100,
+						Some(rational!(15 / 1_000_000_000)),
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(5),
+						Some(XcmAssetLocation(MultiLocation {
+							parents: 0,
+							interior: X1(GeneralIndex(5)),
+						})),
+						"PBLO".as_bytes().to_vec(),
+						"PBLO".as_bytes().to_vec(),
+						12,
+						100_000_000_000,
+						Some(rational!(1 / 1)),
+					),
+					AssetCreationInput::new_asset(
+						CurrencyId(6),
+						None,
+						"ibcDOT".as_bytes().to_vec(),
+						"ibcDOT".as_bytes().to_vec(),
+						12,
+						214_300_000,
+						None,
+					),
+				];
 
-			add_assets_to_storage(assets)
+				let total_weight = add_assets_to_storage(assets);
+				StorageVersion::new(1).put::<AssetsRegistry>();
+				total_weight
+			} else {
+				<Runtime as system::Config>::DbWeight::get().reads(1)
+			}
 		}
 	}
 	#[cfg(test)]
@@ -279,6 +290,19 @@ pub mod hard_coded_assets {
 		mod migrate_asset {
 
 			use super::*;
+
+			#[test]
+			fn storage_version() {
+				new_test_ext().execute_with(|| {
+					let on_chain_version =
+						<AssetsRegistry as GetStorageVersion>::on_chain_storage_version();
+					assert_eq!(on_chain_version, 0);
+					StorageVersion::new(1).put::<AssetsRegistry>();
+					let on_chain_version =
+						<AssetsRegistry as GetStorageVersion>::on_chain_storage_version();
+					assert_eq!(on_chain_version, 1)
+				})
+			}
 
 			#[test]
 			fn should_migrate_local_asset() {
