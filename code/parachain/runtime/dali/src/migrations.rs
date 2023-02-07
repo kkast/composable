@@ -30,7 +30,7 @@ pub mod hard_coded_assets {
 			AssetInfo, AssetInfoUpdate, BiBoundedAssetName, BiBoundedAssetSymbol,
 			InspectRegistryMetadata,
 		},
-		currency::Rational64,
+		currency::{AssetExistentialDepositInspect, Rational64},
 		rational,
 	};
 	use frame_support::{
@@ -134,7 +134,9 @@ pub mod hard_coded_assets {
 				panic!("location is not None for local asset_id");
 			}
 			// check if there is local asset with asset_id
-			if <AssetsRegistry as InspectRegistryMetadata>::asset_name(&asset_id).is_some() {
+			if <AssetsRegistry as AssetExistentialDepositInspect>::existential_deposit(asset_id)
+				.is_ok()
+			{
 				<AssetsRegistry as RemoteAssetRegistryMutate>::update_asset(
 					asset_id,
 					asset_info_update(asset_info.clone()),
@@ -339,8 +341,6 @@ pub mod hard_coded_assets {
 		}
 
 		mod migrate_asset {
-
-			use composable_traits::currency::AssetExistentialDepositInspect;
 
 			use super::*;
 
