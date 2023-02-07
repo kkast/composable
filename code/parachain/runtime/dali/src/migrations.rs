@@ -340,6 +340,8 @@ pub mod hard_coded_assets {
 
 		mod migrate_asset {
 
+			use composable_traits::currency::AssetExistentialDepositInspect;
+
 			use super::*;
 
 			#[test]
@@ -610,6 +612,18 @@ pub mod hard_coded_assets {
 					assert_eq!(
 						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(6)),
 						None
+					);
+					assert_eq!(
+						<AssetsRegistry as AssetExistentialDepositInspect>::existential_deposit(
+							CurrencyId(5)
+						),
+						Ok(100_000_000_000)
+					);
+					assert_eq!(
+						<AssetsRegistry as AssetExistentialDepositInspect>::existential_deposit(
+							CurrencyId(6)
+						),
+						Ok(214_300_000)
 					);
 				})
 			}
