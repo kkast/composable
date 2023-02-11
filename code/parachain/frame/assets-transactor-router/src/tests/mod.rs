@@ -3,3 +3,6 @@ mod extrinsics;
 
 #[cfg(test)]
 mod traits;
+
+#[cfg(test)]
+mod routes;
