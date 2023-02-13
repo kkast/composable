@@ -26,10 +26,7 @@ pub mod hard_coded_assets {
 	use super::*;
 	use assets_registry::WeightInfo;
 	use composable_traits::{
-		assets::{
-			AssetInfo, AssetInfoUpdate, BiBoundedAssetName, BiBoundedAssetSymbol,
-			InspectRegistryMetadata,
-		},
+		assets::{AssetInfo, AssetInfoUpdate, BiBoundedAssetName, BiBoundedAssetSymbol},
 		currency::{AssetExistentialDepositInspect, Rational64},
 		rational,
 		storage::UpdateValue,
@@ -333,6 +330,7 @@ pub mod hard_coded_assets {
 		use frame_support::sp_io;
 
 		use super::*;
+		use composable_traits::assets::InspectRegistryMetadata;
 
 		pub fn new_test_ext() -> sp_io::TestExternalities {
 			let storage = frame_system::GenesisConfig::default()
