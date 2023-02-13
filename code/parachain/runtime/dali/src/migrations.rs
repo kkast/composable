@@ -32,6 +32,7 @@ pub mod hard_coded_assets {
 		},
 		currency::{AssetExistentialDepositInspect, Rational64},
 		rational,
+		storage::UpdateValue,
 	};
 	use frame_support::{
 		traits::{GetStorageVersion, StorageVersion},
@@ -56,7 +57,7 @@ pub mod hard_coded_assets {
 			location: Option<XcmAssetLocation>,
 			name: Option<BiBoundedAssetName>,
 			symbol: Option<BiBoundedAssetSymbol>,
-			decimals: u8,
+			decimals: Option<u8>,
 			existential_deposit: Balance,
 			ratio: Option<Rational64>,
 		) -> Self {
@@ -68,13 +69,15 @@ pub mod hard_coded_assets {
 		}
 	}
 
+	// in case the asset exists in assets registry but we still want to migrate it
+	// new asset info will overwrite old metadata
 	fn asset_info_update(asset_info: AssetInfo<Balance>) -> AssetInfoUpdate<Balance> {
 		AssetInfoUpdate {
-			name: Some(asset_info.name),
-			symbol: Some(asset_info.symbol),
-			decimals: Some(asset_info.decimals),
-			existential_deposit: Some(asset_info.existential_deposit),
-			ratio: Some(asset_info.ratio),
+			name: UpdateValue::Set(asset_info.name),
+			symbol: UpdateValue::Set(asset_info.symbol),
+			decimals: UpdateValue::Set(asset_info.decimals),
+			existential_deposit: UpdateValue::Set(asset_info.existential_deposit),
+			ratio: UpdateValue::Set(asset_info.ratio),
 		}
 	}
 
@@ -178,7 +181,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100_000_000_000,
 						None,
 					),
@@ -193,7 +196,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						37_500_000,
 						Some(rational!(375 / 1_000_000)),
 					),
@@ -208,7 +211,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"KSM_USDT_LPT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100,
 						None,
 					),
@@ -223,7 +226,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PICA_USDT_LPT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100,
 						None,
 					),
@@ -238,7 +241,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PICA_KSM_LPT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100,
 						None,
 					),
@@ -262,7 +265,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"kUSD".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100_000_000,
 						Some(rational!(15 / 1_000)),
 					),
@@ -284,7 +287,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"USDT".to_vec())
 								.expect("String is within bounds"),
 						),
-						6,
+						Some(6),
 						100,
 						Some(rational!(15 / 1_000_000_000)),
 					),
@@ -299,7 +302,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PBLO".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100_000_000_000,
 						Some(rational!(1 / 1)),
 					),
@@ -311,7 +314,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"ibcDOT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						214_300_000,
 						None,
 					),
@@ -370,7 +373,7 @@ pub mod hard_coded_assets {
 						BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
 							.expect("String is within bounds"),
 					),
-					12,
+					Some(12),
 					100_000_000_000,
 					None,
 				)];
@@ -396,7 +399,7 @@ pub mod hard_coded_assets {
 						BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
 							.expect("String is within bounds"),
 					),
-					12,
+					Some(12),
 					37_500_000,
 					Some(rational!(375 / 1_000_000)),
 				)];
@@ -436,7 +439,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100_000_000_000,
 						None,
 					),
@@ -451,7 +454,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						37_500_000,
 						Some(rational!(375 / 1_000_000)),
 					),
@@ -466,7 +469,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"KSM_USDT_LPT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100,
 						None,
 					),
@@ -481,7 +484,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PICA_USDT_LPT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100,
 						None,
 					),
@@ -496,7 +499,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PICA_KSM_LPT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100,
 						None,
 					),
@@ -520,7 +523,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"kUSD".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100_000_000,
 						Some(rational!(15 / 1_000)),
 					),
@@ -542,7 +545,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"USDT".to_vec())
 								.expect("String is within bounds"),
 						),
-						6,
+						Some(6),
 						100,
 						Some(rational!(15 / 1_000_000_000)),
 					),
@@ -557,7 +560,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"PBLO".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						100_000_000_000,
 						Some(rational!(1 / 1)),
 					),
@@ -569,7 +572,7 @@ pub mod hard_coded_assets {
 							BiBoundedAssetSymbol::from_vec(b"ibcDOT".to_vec())
 								.expect("String is within bounds"),
 						),
-						12,
+						Some(12),
 						214_300_000,
 						None,
 					),
