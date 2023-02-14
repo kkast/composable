@@ -10,7 +10,7 @@ const ACCOUNT_NATIVE: u128 = 1;
 const ACCOUNT_LOCAL: u128 = 2;
 const ACCOUNT_FOREIGN: u128 = 3;
 const ACCOUNT_TO: u128 = 4;
-mod should_route {
+mod orml_route {
 	use composable_traits::{
 		assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
 		xcm::assets::XcmAssetLocation,
@@ -910,6 +910,595 @@ mod should_route {
 			assert_eq!(
 				<<Test as Config>::ForeignTransactor>::total_balance(asset_id_foreign, &ACCOUNT_TO),
 				500
+			);
+		});
+	}
+}
+mod orml_route_asset_type {
+	use composable_traits::{
+		assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
+		xcm::assets::XcmAssetLocation,
+	};
+	use frame_support::{
+		assert_err, assert_noop, assert_ok,
+		pallet_prelude::DispatchResult,
+		traits::{Currency, ReservableCurrency, WithdrawReasons},
+	};
+	use orml_traits::{MultiCurrency, MultiReservableCurrency};
+	use sp_runtime::DispatchError;
+
+	use crate::mocks::{AccountId, RuntimeOrigin};
+
+	use super::*;
+
+	#[test]
+	fn ensure_can_withdraw() {
+		let protocol_id_local = *b"testloca";
+		let nonce_local = 0;
+		let protocol_id_foreign = *b"testfore";
+		let nonce_foreign = 0;
+		let asset_info_local = AssetInfo {
+			name: Some(
+				BiBoundedAssetName::from_vec(b"local asset".to_vec())
+					.expect("string is within bound"),
+			),
+			symbol: None,
+			decimals: Some(12),
+			ratio: None,
+			existential_deposit: 100,
+		};
+
+		new_test_ext().execute_with(|| {
+			let asset_id_local = Pallet::<Test>::create_local_asset(
+				protocol_id_local,
+				nonce_local,
+				asset_info_local,
+			)
+			.unwrap();
+
+			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
+			let foreign_asset_info = AssetInfo {
+				name: Some(
+					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+						.expect("string is within bound"),
+				),
+				symbol: Some(
+					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+						.expect("string is withing bound"),
+				),
+				decimals: Some(12),
+				ratio: None,
+				existential_deposit: 1000,
+			};
+
+			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
+				protocol_id_foreign,
+				nonce_foreign,
+				foreign_asset_info,
+				foreign_asset_id,
+			)
+			.unwrap();
+
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
+				.unwrap();
+			Pallet::<Test>::mint_into(
+				RuntimeOrigin::root(),
+				asset_id_foreign,
+				ACCOUNT_FOREIGN,
+				2000,
+			)
+			.unwrap();
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
+				.unwrap();
+
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::ensure_can_withdraw(
+				NATIVE_ASSET_ID,
+				&ACCOUNT_NATIVE,
+				3000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::ensure_can_withdraw(
+				asset_id_local,
+				&ACCOUNT_LOCAL,
+				1000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::ensure_can_withdraw(
+				asset_id_foreign,
+				&ACCOUNT_FOREIGN,
+				2000
+			),);
+
+			assert_ok!(<<Test as Config>::NativeTransactor>::ensure_can_withdraw(
+				&ACCOUNT_NATIVE,
+				3000,
+				WithdrawReasons::all(),
+				0
+			));
+			assert_ok!(<<Test as Config>::LocalTransactor>::ensure_can_withdraw(
+				asset_id_local,
+				&ACCOUNT_LOCAL,
+				1000
+			));
+			<<Test as Config>::LocalTransactor>::ensure_can_withdraw(
+				NATIVE_ASSET_ID,
+				&ACCOUNT_NATIVE,
+				1000,
+			)
+			.expect_err("wrong route");
+			assert_ok!(<<Test as Config>::ForeignTransactor>::ensure_can_withdraw(
+				asset_id_foreign,
+				&ACCOUNT_FOREIGN,
+				2000
+			),);
+		});
+	}
+	#[test]
+	fn transfer() {
+		let protocol_id_local = *b"testloca";
+		let nonce_local = 0;
+		let protocol_id_foreign = *b"testfore";
+		let nonce_foreign = 0;
+		let asset_info_local = AssetInfo {
+			name: Some(
+				BiBoundedAssetName::from_vec(b"local asset".to_vec())
+					.expect("string is within bound"),
+			),
+			symbol: None,
+			decimals: Some(12),
+			ratio: None,
+			existential_deposit: 100,
+		};
+
+		new_test_ext().execute_with(|| {
+			let asset_id_local = Pallet::<Test>::create_local_asset(
+				protocol_id_local,
+				nonce_local,
+				asset_info_local,
+			)
+			.unwrap();
+
+			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
+			let foreign_asset_info = AssetInfo {
+				name: Some(
+					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+						.expect("string is within bound"),
+				),
+				symbol: Some(
+					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+						.expect("string is withing bound"),
+				),
+				decimals: Some(12),
+				ratio: None,
+				existential_deposit: 1000,
+			};
+
+			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
+				protocol_id_foreign,
+				nonce_foreign,
+				foreign_asset_info,
+				foreign_asset_id,
+			)
+			.unwrap();
+
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
+				.unwrap();
+			Pallet::<Test>::mint_into(
+				RuntimeOrigin::root(),
+				asset_id_foreign,
+				ACCOUNT_FOREIGN,
+				2000,
+			)
+			.unwrap();
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
+				.unwrap();
+
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::transfer(
+				NATIVE_ASSET_ID,
+				&ACCOUNT_NATIVE,
+				&ACCOUNT_TO,
+				3000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::transfer(
+				asset_id_local,
+				&ACCOUNT_LOCAL,
+				&ACCOUNT_TO,
+				1000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::transfer(
+				asset_id_foreign,
+				&ACCOUNT_FOREIGN,
+				&ACCOUNT_TO,
+				2000
+			),);
+
+			assert_eq!(<<Test as Config>::NativeTransactor>::total_balance(&ACCOUNT_TO), 3000);
+			assert_eq!(
+				<<Test as Config>::LocalTransactor>::total_balance(asset_id_local, &ACCOUNT_TO),
+				1000
+			);
+			assert_eq!(
+				<<Test as Config>::ForeignTransactor>::total_balance(asset_id_foreign, &ACCOUNT_TO),
+				2000
+			);
+		});
+	}
+	#[test]
+	fn deposit() {
+		let protocol_id_local = *b"testloca";
+		let nonce_local = 0;
+		let protocol_id_foreign = *b"testfore";
+		let nonce_foreign = 0;
+		let asset_info_local = AssetInfo {
+			name: Some(
+				BiBoundedAssetName::from_vec(b"local asset".to_vec())
+					.expect("string is within bound"),
+			),
+			symbol: None,
+			decimals: Some(12),
+			ratio: None,
+			existential_deposit: 100,
+		};
+
+		new_test_ext().execute_with(|| {
+			let asset_id_local = Pallet::<Test>::create_local_asset(
+				protocol_id_local,
+				nonce_local,
+				asset_info_local,
+			)
+			.unwrap();
+
+			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
+			let foreign_asset_info = AssetInfo {
+				name: Some(
+					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+						.expect("string is within bound"),
+				),
+				symbol: Some(
+					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+						.expect("string is withing bound"),
+				),
+				decimals: Some(12),
+				ratio: None,
+				existential_deposit: 1000,
+			};
+
+			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
+				protocol_id_foreign,
+				nonce_foreign,
+				foreign_asset_info,
+				foreign_asset_id,
+			)
+			.unwrap();
+
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::deposit(
+				NATIVE_ASSET_ID,
+				&ACCOUNT_NATIVE,
+				3000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::deposit(
+				asset_id_local,
+				&ACCOUNT_LOCAL,
+				1000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::deposit(
+				asset_id_foreign,
+				&ACCOUNT_FOREIGN,
+				2000
+			),);
+
+			assert_eq!(<<Test as Config>::NativeTransactor>::total_balance(&ACCOUNT_NATIVE), 3000);
+			assert_eq!(
+				<<Test as Config>::LocalTransactor>::total_balance(asset_id_local, &ACCOUNT_LOCAL),
+				1000
+			);
+			assert_eq!(
+				<<Test as Config>::ForeignTransactor>::total_balance(
+					asset_id_foreign,
+					&ACCOUNT_FOREIGN
+				),
+				2000
+			);
+		});
+	}
+	#[test]
+	fn withdraw() {
+		let protocol_id_local = *b"testloca";
+		let nonce_local = 0;
+		let protocol_id_foreign = *b"testfore";
+		let nonce_foreign = 0;
+		let asset_info_local = AssetInfo {
+			name: Some(
+				BiBoundedAssetName::from_vec(b"local asset".to_vec())
+					.expect("string is within bound"),
+			),
+			symbol: None,
+			decimals: Some(12),
+			ratio: None,
+			existential_deposit: 100,
+		};
+
+		new_test_ext().execute_with(|| {
+			let asset_id_local = Pallet::<Test>::create_local_asset(
+				protocol_id_local,
+				nonce_local,
+				asset_info_local,
+			)
+			.unwrap();
+
+			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
+			let foreign_asset_info = AssetInfo {
+				name: Some(
+					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+						.expect("string is within bound"),
+				),
+				symbol: Some(
+					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+						.expect("string is withing bound"),
+				),
+				decimals: Some(12),
+				ratio: None,
+				existential_deposit: 1000,
+			};
+
+			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
+				protocol_id_foreign,
+				nonce_foreign,
+				foreign_asset_info,
+				foreign_asset_id,
+			)
+			.unwrap();
+
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
+				.unwrap();
+			Pallet::<Test>::mint_into(
+				RuntimeOrigin::root(),
+				asset_id_foreign,
+				ACCOUNT_FOREIGN,
+				2000,
+			)
+			.unwrap();
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
+				.unwrap();
+
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::withdraw(
+				NATIVE_ASSET_ID,
+				&ACCOUNT_NATIVE,
+				3000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::withdraw(
+				asset_id_local,
+				&ACCOUNT_LOCAL,
+				1000
+			),);
+			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::withdraw(
+				asset_id_foreign,
+				&ACCOUNT_FOREIGN,
+				2000
+			),);
+
+			assert_eq!(<<Test as Config>::NativeTransactor>::total_balance(&ACCOUNT_NATIVE), 0);
+			assert_eq!(
+				<<Test as Config>::LocalTransactor>::total_balance(asset_id_local, &ACCOUNT_LOCAL),
+				0
+			);
+			assert_eq!(
+				<<Test as Config>::ForeignTransactor>::total_balance(
+					asset_id_foreign,
+					&ACCOUNT_FOREIGN
+				),
+				0
+			);
+		});
+	}
+	#[test]
+	fn slash() {
+		let protocol_id_local = *b"testloca";
+		let nonce_local = 0;
+		let protocol_id_foreign = *b"testfore";
+		let nonce_foreign = 0;
+		let asset_info_local = AssetInfo {
+			name: Some(
+				BiBoundedAssetName::from_vec(b"local asset".to_vec())
+					.expect("string is within bound"),
+			),
+			symbol: None,
+			decimals: Some(12),
+			ratio: None,
+			existential_deposit: 100,
+		};
+
+		new_test_ext().execute_with(|| {
+			let asset_id_local = Pallet::<Test>::create_local_asset(
+				protocol_id_local,
+				nonce_local,
+				asset_info_local,
+			)
+			.unwrap();
+
+			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
+			let foreign_asset_info = AssetInfo {
+				name: Some(
+					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+						.expect("string is within bound"),
+				),
+				symbol: Some(
+					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+						.expect("string is withing bound"),
+				),
+				decimals: Some(12),
+				ratio: None,
+				existential_deposit: 1000,
+			};
+
+			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
+				protocol_id_foreign,
+				nonce_foreign,
+				foreign_asset_info,
+				foreign_asset_id,
+			)
+			.unwrap();
+
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
+				.unwrap();
+			Pallet::<Test>::mint_into(
+				RuntimeOrigin::root(),
+				asset_id_foreign,
+				ACCOUNT_FOREIGN,
+				2000,
+			)
+			.unwrap();
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
+				.unwrap();
+
+			assert_eq!(
+				<Pallet::<Test> as MultiCurrency<AccountId>>::slash(
+					NATIVE_ASSET_ID,
+					&ACCOUNT_NATIVE,
+					3000
+				),
+				0
+			);
+			assert_eq!(
+				<Pallet::<Test> as MultiCurrency<AccountId>>::slash(
+					asset_id_local,
+					&ACCOUNT_LOCAL,
+					1000
+				),
+				0
+			);
+			assert_eq!(
+				<Pallet::<Test> as MultiCurrency<AccountId>>::slash(
+					asset_id_foreign,
+					&ACCOUNT_FOREIGN,
+					2000
+				),
+				0
+			);
+
+			assert_eq!(<<Test as Config>::NativeTransactor>::total_balance(&ACCOUNT_NATIVE), 0);
+			assert_eq!(
+				<<Test as Config>::LocalTransactor>::total_balance(asset_id_local, &ACCOUNT_LOCAL),
+				0
+			);
+			assert_eq!(
+				<<Test as Config>::ForeignTransactor>::total_balance(
+					asset_id_foreign,
+					&ACCOUNT_FOREIGN
+				),
+				0
+			);
+		});
+	}
+	#[test]
+	fn slash_reserved() {
+		let protocol_id_local = *b"testloca";
+		let nonce_local = 0;
+		let protocol_id_foreign = *b"testfore";
+		let nonce_foreign = 0;
+		let asset_info_local = AssetInfo {
+			name: Some(
+				BiBoundedAssetName::from_vec(b"local asset".to_vec())
+					.expect("string is within bound"),
+			),
+			symbol: None,
+			decimals: Some(12),
+			ratio: None,
+			existential_deposit: 100,
+		};
+
+		new_test_ext().execute_with(|| {
+			let asset_id_local = Pallet::<Test>::create_local_asset(
+				protocol_id_local,
+				nonce_local,
+				asset_info_local,
+			)
+			.unwrap();
+
+			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
+			let foreign_asset_info = AssetInfo {
+				name: Some(
+					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+						.expect("string is within bound"),
+				),
+				symbol: Some(
+					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+						.expect("string is withing bound"),
+				),
+				decimals: Some(12),
+				ratio: None,
+				existential_deposit: 1000,
+			};
+
+			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
+				protocol_id_foreign,
+				nonce_foreign,
+				foreign_asset_info,
+				foreign_asset_id,
+			)
+			.unwrap();
+
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
+				.unwrap();
+			Pallet::<Test>::mint_into(
+				RuntimeOrigin::root(),
+				asset_id_foreign,
+				ACCOUNT_FOREIGN,
+				2000,
+			)
+			.unwrap();
+			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
+				.unwrap();
+			assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::reserve(
+				NATIVE_ASSET_ID,
+				&ACCOUNT_NATIVE,
+				2500,
+			));
+			assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::reserve(
+				asset_id_local,
+				&ACCOUNT_LOCAL,
+				900,
+			));
+			assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::reserve(
+				asset_id_foreign,
+				&ACCOUNT_FOREIGN,
+				2000,
+			));
+
+			assert_eq!(
+				<Pallet::<Test> as MultiReservableCurrency<AccountId>>::slash_reserved(
+					NATIVE_ASSET_ID,
+					&ACCOUNT_NATIVE,
+					2500
+				),
+				0
+			);
+			assert_eq!(
+				<Pallet::<Test> as MultiReservableCurrency<AccountId>>::slash_reserved(
+					asset_id_local,
+					&ACCOUNT_LOCAL,
+					900
+				),
+				0
+			);
+			assert_eq!(
+				<Pallet::<Test> as MultiReservableCurrency<AccountId>>::slash_reserved(
+					asset_id_foreign,
+					&ACCOUNT_FOREIGN,
+					2000
+				),
+				0
+			);
+
+			assert_eq!(<<Test as Config>::NativeTransactor>::total_balance(&ACCOUNT_NATIVE), 500);
+			assert_eq!(
+				<<Test as Config>::LocalTransactor>::total_balance(asset_id_local, &ACCOUNT_LOCAL),
+				100
+			);
+			assert_eq!(
+				<<Test as Config>::ForeignTransactor>::total_balance(
+					asset_id_foreign,
+					&ACCOUNT_FOREIGN
+				),
+				0
 			);
 		});
 	}
