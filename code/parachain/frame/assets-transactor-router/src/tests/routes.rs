@@ -920,12 +920,11 @@ mod orml_route_asset_type {
 		xcm::assets::XcmAssetLocation,
 	};
 	use frame_support::{
-		assert_err, assert_noop, assert_ok,
-		pallet_prelude::DispatchResult,
-		traits::{Currency, ReservableCurrency, WithdrawReasons},
+		assert_ok,
+		traits::{Currency, WithdrawReasons},
 	};
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
-	use sp_runtime::DispatchError;
+	
 
 	use crate::mocks::{AccountId, RuntimeOrigin};
 
@@ -1512,10 +1511,10 @@ mod fungibles_route {
 		assert_ok,
 		traits::{
 			fungibles::{Inspect, InspectHold, Mutate, MutateHold, Transfer, Unbalanced},
-			Currency, ReservableCurrency,
+			Currency,
 		},
 	};
-	use orml_traits::{MultiCurrency, MultiReservableCurrency};
+	use orml_traits::{MultiCurrency};
 
 	use crate::mocks::{AccountId, RuntimeOrigin};
 
