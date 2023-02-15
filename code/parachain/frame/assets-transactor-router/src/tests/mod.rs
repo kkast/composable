@@ -5,4 +5,4 @@ mod extrinsics;
 mod traits;
 
 #[cfg(test)]
-mod routes;
+mod routing;
