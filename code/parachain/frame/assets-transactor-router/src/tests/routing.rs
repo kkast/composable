@@ -1,6 +1,10 @@
 #![allow(clippy::disallowed_methods)] // allow unwrap() in tests
 use crate::mocks::AssetId;
 
+use composable_traits::{
+	assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
+	xcm::assets::XcmAssetLocation,
+};
 use mocks::{new_test_ext, Test};
 
 use crate::*;
@@ -10,11 +14,49 @@ const ACCOUNT_NATIVE: u128 = 1;
 const ACCOUNT_LOCAL: u128 = 2;
 const ACCOUNT_FOREIGN: u128 = 3;
 const ACCOUNT_TO: u128 = 4;
-mod orml_route {
-	use composable_traits::{
-		assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
-		xcm::assets::XcmAssetLocation,
+
+fn create_assets() -> (AssetId, AssetId) {
+	let protocol_id_local = *b"testloca";
+	let nonce_local = 0;
+	let protocol_id_foreign = *b"testfore";
+	let nonce_foreign = 0;
+	let asset_info_local = AssetInfo {
+		name: Some(
+			BiBoundedAssetName::from_vec(b"local asset".to_vec()).expect("string is within bound"),
+		),
+		symbol: None,
+		decimals: Some(12),
+		ratio: None,
+		existential_deposit: 100,
 	};
+	let asset_id_local =
+		Pallet::<Test>::create_local_asset(protocol_id_local, nonce_local, asset_info_local)
+			.unwrap();
+
+	let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
+	let foreign_asset_info = AssetInfo {
+		name: Some(
+			BiBoundedAssetName::from_vec(b"Kusama".to_vec()).expect("string is within bound"),
+		),
+		symbol: Some(
+			BiBoundedAssetSymbol::from_vec(b"KSM".to_vec()).expect("string is withing bound"),
+		),
+		decimals: Some(12),
+		ratio: None,
+		existential_deposit: 1000,
+	};
+
+	let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
+		protocol_id_foreign,
+		nonce_foreign,
+		foreign_asset_info,
+		foreign_asset_id,
+	)
+	.unwrap();
+	(asset_id_local, asset_id_foreign)
+}
+
+mod orml_route {
 	use frame_support::{
 		assert_ok,
 		traits::{Currency, ReservableCurrency},
@@ -27,52 +69,8 @@ mod orml_route {
 
 	#[test]
 	fn minimum_balance() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			assert_eq!(
 				<Pallet::<Test> as MultiCurrency<AccountId>>::minimum_balance(NATIVE_ASSET_ID),
 				1
@@ -96,52 +94,8 @@ mod orml_route {
 
 	#[test]
 	fn total_issuance() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
 			Pallet::<Test>::mint_into(
@@ -175,53 +129,11 @@ mod orml_route {
 			);
 		});
 	}
+
 	#[test]
 	fn total_balance() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -271,54 +183,11 @@ mod orml_route {
 			);
 		});
 	}
+
 	#[test]
 	fn free_balance() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
 			Pallet::<Test>::mint_into(
@@ -370,51 +239,8 @@ mod orml_route {
 
 	#[test]
 	fn can_slash() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -460,52 +286,8 @@ mod orml_route {
 
 	#[test]
 	fn can_reserve() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
 			Pallet::<Test>::mint_into(
@@ -550,51 +332,8 @@ mod orml_route {
 
 	#[test]
 	fn reserve() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -723,51 +462,8 @@ mod orml_route {
 
 	#[test]
 	fn repatriate_reserved() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -914,17 +610,13 @@ mod orml_route {
 		});
 	}
 }
+
 mod orml_route_asset_type {
-	use composable_traits::{
-		assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
-		xcm::assets::XcmAssetLocation,
-	};
 	use frame_support::{
 		assert_ok,
 		traits::{Currency, WithdrawReasons},
 	};
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
-	
 
 	use crate::mocks::{AccountId, RuntimeOrigin};
 
@@ -932,52 +624,8 @@ mod orml_route_asset_type {
 
 	#[test]
 	fn ensure_can_withdraw() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
 			Pallet::<Test>::mint_into(
@@ -1030,53 +678,11 @@ mod orml_route_asset_type {
 			),);
 		});
 	}
+
 	#[test]
 	fn transfer() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -1120,53 +726,11 @@ mod orml_route_asset_type {
 			);
 		});
 	}
+
 	#[test]
 	fn deposit() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::deposit(
 				NATIVE_ASSET_ID,
@@ -1198,53 +762,11 @@ mod orml_route_asset_type {
 			);
 		});
 	}
+
 	#[test]
 	fn withdraw() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -1288,53 +810,11 @@ mod orml_route_asset_type {
 			);
 		});
 	}
+
 	#[test]
 	fn slash() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -1387,54 +867,11 @@ mod orml_route_asset_type {
 			);
 		});
 	}
+
 	#[test]
 	fn slash_reserved() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
 			Pallet::<Test>::mint_into(
@@ -1502,11 +939,8 @@ mod orml_route_asset_type {
 		});
 	}
 }
+
 mod fungibles_route {
-	use composable_traits::{
-		assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
-		xcm::assets::XcmAssetLocation,
-	};
 	use frame_support::{
 		assert_ok,
 		traits::{
@@ -1514,7 +948,7 @@ mod fungibles_route {
 			Currency,
 		},
 	};
-	use orml_traits::{MultiCurrency};
+	use orml_traits::MultiCurrency;
 
 	use crate::mocks::{AccountId, RuntimeOrigin};
 
@@ -1522,63 +956,8 @@ mod fungibles_route {
 
 	#[test]
 	fn set_balance() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
-			// Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-			// 	.unwrap();
-			// Pallet::<Test>::mint_into(
-			// 	RuntimeOrigin::root(),
-			// 	asset_id_foreign,
-			// 	ACCOUNT_FOREIGN,
-			// 	2000,
-			// )
-			// .unwrap();
-			// Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE,
-			// 3000) 	.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			assert_ok!(<Pallet<Test> as Unbalanced<AccountId>>::set_balance(
 				NATIVE_ASSET_ID,
 				&ACCOUNT_NATIVE,
@@ -1609,53 +988,11 @@ mod fungibles_route {
 			);
 		});
 	}
+
 	#[test]
 	fn set_total_issuance() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			<Pallet<Test> as Unbalanced<AccountId>>::set_total_issuance(NATIVE_ASSET_ID, 3000);
 			<Pallet<Test> as Unbalanced<AccountId>>::set_total_issuance(asset_id_local, 1000);
@@ -1669,54 +1006,11 @@ mod fungibles_route {
 			);
 		});
 	}
+
 	#[test]
 	fn transfer() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
-
+			let (asset_id_local, asset_id_foreign) = create_assets();
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
 			Pallet::<Test>::mint_into(
@@ -1774,53 +1068,11 @@ mod fungibles_route {
 			);
 		});
 	}
+
 	#[test]
 	fn hold() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
@@ -1885,53 +1137,11 @@ mod fungibles_route {
 			);
 		});
 	}
+
 	#[test]
 	fn slash() {
-		let protocol_id_local = *b"testloca";
-		let nonce_local = 0;
-		let protocol_id_foreign = *b"testfore";
-		let nonce_foreign = 0;
-		let asset_info_local = AssetInfo {
-			name: Some(
-				BiBoundedAssetName::from_vec(b"local asset".to_vec())
-					.expect("string is within bound"),
-			),
-			symbol: None,
-			decimals: Some(12),
-			ratio: None,
-			existential_deposit: 100,
-		};
-
 		new_test_ext().execute_with(|| {
-			let asset_id_local = Pallet::<Test>::create_local_asset(
-				protocol_id_local,
-				nonce_local,
-				asset_info_local,
-			)
-			.unwrap();
-
-			let foreign_asset_id = XcmAssetLocation(xcm::v2::MultiLocation::parent());
-			let foreign_asset_info = AssetInfo {
-				name: Some(
-					BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-						.expect("string is within bound"),
-				),
-				symbol: Some(
-					BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-						.expect("string is withing bound"),
-				),
-				decimals: Some(12),
-				ratio: None,
-				existential_deposit: 1000,
-			};
-
-			let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-				protocol_id_foreign,
-				nonce_foreign,
-				foreign_asset_info,
-				foreign_asset_id,
-			)
-			.unwrap();
+			let (asset_id_local, asset_id_foreign) = create_assets();
 
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
 				.unwrap();
