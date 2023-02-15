@@ -1,5 +1,5 @@
 #![allow(clippy::disallowed_methods)] // allow unwrap() in tests
-use crate::mocks::AssetId;
+use crate::mocks::{AssetId, RuntimeOrigin};
 
 use composable_traits::{
 	assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
@@ -15,6 +15,7 @@ const ACCOUNT_LOCAL: u128 = 2;
 const ACCOUNT_FOREIGN: u128 = 3;
 const ACCOUNT_TO: u128 = 4;
 
+// creates for routing 1 local asset and 1 foreign asset(native asset is specified in config)
 fn create_assets() -> (AssetId, AssetId) {
 	let protocol_id_local = *b"testloca";
 	let nonce_local = 0;
@@ -56,6 +57,16 @@ fn create_assets() -> (AssetId, AssetId) {
 	(asset_id_local, asset_id_foreign)
 }
 
+// issue assets to different accounts and in different amount
+fn mint_assets(asset_id_local: AssetId, asset_id_foreign: AssetId) {
+	Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000).unwrap();
+	Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_foreign, ACCOUNT_FOREIGN, 2000)
+		.unwrap();
+	Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
+		.unwrap();
+}
+
+// tests for route macro in orml.rs
 mod orml_route {
 	use frame_support::{
 		assert_ok,
@@ -69,6 +80,7 @@ mod orml_route {
 
 	#[test]
 	fn minimum_balance() {
+		// tests ED specified in pallet's Configs via common interface and per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
 			assert_eq!(
@@ -94,20 +106,10 @@ mod orml_route {
 
 	#[test]
 	fn total_issuance() {
+		// mint assets and check new issuance via common interface and per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
-
+			mint_assets(asset_id_local, asset_id_foreign);
 			assert_eq!(
 				<Pallet::<Test> as MultiCurrency<AccountId>>::total_issuance(NATIVE_ASSET_ID),
 				3000
@@ -132,20 +134,10 @@ mod orml_route {
 
 	#[test]
 	fn total_balance() {
+		// mint assets and check that balances are correct
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_eq!(
 				<Pallet::<Test> as MultiCurrency<AccountId>>::total_balance(
@@ -186,19 +178,11 @@ mod orml_route {
 
 	#[test]
 	fn free_balance() {
+		// mint assets. via common interface check that all amounts are free balances
+		// check that free balances are correct per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_eq!(
 				<Pallet::<Test> as MultiCurrency<AccountId>>::free_balance(
@@ -239,21 +223,11 @@ mod orml_route {
 
 	#[test]
 	fn can_slash() {
+		// mint assets. via common interface check that can_slash
+		// check that can_slash per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
-
+			mint_assets(asset_id_local, asset_id_foreign);
 			assert!(<Pallet::<Test> as MultiCurrency<AccountId>>::can_slash(
 				NATIVE_ASSET_ID,
 				&ACCOUNT_NATIVE,
@@ -286,19 +260,11 @@ mod orml_route {
 
 	#[test]
 	fn can_reserve() {
+		// mint assets. via common interface check that can reserve
+		// check that can reserve per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert!(<Pallet::<Test> as MultiReservableCurrency<AccountId>>::can_reserve(
 				NATIVE_ASSET_ID,
@@ -332,20 +298,13 @@ mod orml_route {
 
 	#[test]
 	fn reserve() {
+		// mint assets. via common interface reserve check that reserved balances are correct
+		// check that reserved balances are correct per pallet
+		// unreserve some of the reserved funds and check reserved balance via common interface
+		// check that reserved balances are correct per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::reserve(
 				NATIVE_ASSET_ID,
@@ -462,20 +421,16 @@ mod orml_route {
 
 	#[test]
 	fn repatriate_reserved() {
+		// mint assets, reserve some of these amounts via common interface
+		// create initial balances for account ACCOUNT_TO for local, foreign, native assets
+		// via common interface repatriate reserved amounts to ACCOUNT_TO's reserved balance, check
+		// all accounts' reserved balances per pallet via common interface repatriate reserved
+		// amounts to ACCOUNT_TO's free balance, check source account's reserved balances and
+		// reciever's free balance per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
+			mint_assets(asset_id_local, asset_id_foreign);
 
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
 			// create accounts
 			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_TO, 100)
 				.unwrap();
@@ -498,6 +453,7 @@ mod orml_route {
 				&ACCOUNT_FOREIGN,
 				2000,
 			));
+			// test repatriate to reserved
 			assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::repatriate_reserved(
 				NATIVE_ASSET_ID,
 				&ACCOUNT_NATIVE,
@@ -549,6 +505,7 @@ mod orml_route {
 				),
 				200
 			);
+			// test repatriate to free
 			assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::repatriate_reserved(
 				NATIVE_ASSET_ID,
 				&ACCOUNT_NATIVE,
@@ -590,10 +547,12 @@ mod orml_route {
 			);
 			// initial 100 + 300 slashed
 			assert_eq!(<<Test as Config>::NativeTransactor>::free_balance(&ACCOUNT_TO), 400);
+			// initial 100 + 100 slashed
 			assert_eq!(
 				<<Test as Config>::LocalTransactor>::free_balance(asset_id_local, &ACCOUNT_TO),
 				200
 			);
+			// initial 100 + 200 slashed
 			assert_eq!(
 				<<Test as Config>::ForeignTransactor>::free_balance(asset_id_foreign, &ACCOUNT_TO),
 				300
@@ -618,25 +577,16 @@ mod orml_route_asset_type {
 	};
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
 
-	use crate::mocks::{AccountId, RuntimeOrigin};
+	use crate::mocks::AccountId;
 
 	use super::*;
 
 	#[test]
 	fn ensure_can_withdraw() {
+		// mint assets. check that can withdraw via common interface and per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::ensure_can_withdraw(
 				NATIVE_ASSET_ID,
@@ -681,20 +631,10 @@ mod orml_route_asset_type {
 
 	#[test]
 	fn transfer() {
+		// mint assets. via common interface transfer to ACCOUNT_TO, check total_balance per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::transfer(
 				NATIVE_ASSET_ID,
@@ -729,6 +669,7 @@ mod orml_route_asset_type {
 
 	#[test]
 	fn deposit() {
+		// deposit assets via common interface, check total balances per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
 
@@ -765,20 +706,10 @@ mod orml_route_asset_type {
 
 	#[test]
 	fn withdraw() {
+		// mint assets. via common interface withdraw amounts, check total balances per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_ok!(<Pallet::<Test> as MultiCurrency<AccountId>>::withdraw(
 				NATIVE_ASSET_ID,
@@ -813,20 +744,10 @@ mod orml_route_asset_type {
 
 	#[test]
 	fn slash() {
+		// mint assets. via common interface slash them, check balances per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_eq!(
 				<Pallet::<Test> as MultiCurrency<AccountId>>::slash(
@@ -870,19 +791,11 @@ mod orml_route_asset_type {
 
 	#[test]
 	fn slash_reserved() {
+		// mint assets. via common interface reserve them, slash reserved.
+		// check total and reserved balances are correct per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 			assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::reserve(
 				NATIVE_ASSET_ID,
 				&ACCOUNT_NATIVE,
@@ -936,6 +849,21 @@ mod orml_route_asset_type {
 				),
 				0
 			);
+			assert_eq!(<<Test as Config>::NativeTransactor>::reserved_balance(&ACCOUNT_NATIVE), 0);
+			assert_eq!(
+				<<Test as Config>::LocalTransactor>::reserved_balance(
+					asset_id_local,
+					&ACCOUNT_LOCAL
+				),
+				0
+			);
+			assert_eq!(
+				<<Test as Config>::ForeignTransactor>::reserved_balance(
+					asset_id_foreign,
+					&ACCOUNT_FOREIGN
+				),
+				0
+			);
 		});
 	}
 }
@@ -950,12 +878,14 @@ mod fungibles_route {
 	};
 	use orml_traits::MultiCurrency;
 
-	use crate::mocks::{AccountId, RuntimeOrigin};
+	use crate::mocks::AccountId;
 
 	use super::*;
 
 	#[test]
 	fn set_balance() {
+		// set balances for assets via common interface, check that total balance is correct per
+		// pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
 			assert_ok!(<Pallet<Test> as Unbalanced<AccountId>>::set_balance(
@@ -991,6 +921,8 @@ mod fungibles_route {
 
 	#[test]
 	fn set_total_issuance() {
+		// set assets' issuance for assets via common interfact, check that total issuance is
+		// correct per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
 
@@ -1009,19 +941,10 @@ mod fungibles_route {
 
 	#[test]
 	fn transfer() {
+		// mint assets, transfer and checkk balance using common interface, test balances per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_ok!(<Pallet::<Test> as Transfer<AccountId>>::transfer(
 				NATIVE_ASSET_ID,
@@ -1071,20 +994,11 @@ mod fungibles_route {
 
 	#[test]
 	fn hold() {
+		// mint assets, hold  and check balance_on_hold using common interface, test free balances
+		// per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_ok!(<Pallet::<Test> as MutateHold<AccountId>>::hold(
 				NATIVE_ASSET_ID,
@@ -1140,20 +1054,10 @@ mod fungibles_route {
 
 	#[test]
 	fn slash() {
+		// mint assets, slash using common interface, check total balances per pallet
 		new_test_ext().execute_with(|| {
 			let (asset_id_local, asset_id_foreign) = create_assets();
-
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), asset_id_local, ACCOUNT_LOCAL, 1000)
-				.unwrap();
-			Pallet::<Test>::mint_into(
-				RuntimeOrigin::root(),
-				asset_id_foreign,
-				ACCOUNT_FOREIGN,
-				2000,
-			)
-			.unwrap();
-			Pallet::<Test>::mint_into(RuntimeOrigin::root(), NATIVE_ASSET_ID, ACCOUNT_NATIVE, 3000)
-				.unwrap();
+			mint_assets(asset_id_local, asset_id_foreign);
 
 			assert_ok!(<Pallet<Test> as Mutate<AccountId>>::slash(
 				NATIVE_ASSET_ID,
