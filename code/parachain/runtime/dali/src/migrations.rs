@@ -41,29 +41,13 @@ pub mod hard_coded_assets {
 
 	pub struct HardCodedAssetsMigration;
 
+	const ASSETS_REGISTRY_V1: StorageVersion = StorageVersion::new(1);
+
 	#[derive(Clone)]
 	struct AssetCreationInput {
 		asset_id: CurrencyId,
 		location: Option<XcmAssetLocation>,
 		asset_info: AssetInfo<Balance>,
-	}
-
-	impl AssetCreationInput {
-		fn new_asset(
-			asset_id: CurrencyId,
-			location: Option<XcmAssetLocation>,
-			name: Option<BiBoundedAssetName>,
-			symbol: Option<BiBoundedAssetSymbol>,
-			decimals: Option<u8>,
-			existential_deposit: Balance,
-			ratio: Option<Rational64>,
-		) -> Self {
-			Self {
-				asset_id,
-				location,
-				asset_info: AssetInfo { name, symbol, decimals, existential_deposit, ratio },
-			}
-		}
 	}
 
 	// in case the asset exists in assets registry but we still want to migrate it
@@ -85,26 +69,28 @@ pub mod hard_coded_assets {
 			// check if there is data stored for foreign asset
 			if let Some(foreign_location) = location.clone() {
 				// check that new asset_id is the same as old one for the same location
-				let mut location_stored = false;
-				if let Some(prev_asset_id) =
+				let location_stored =
 					<AssetsRegistry as RemoteAssetRegistryInspect>::location_to_asset(
 						foreign_location.clone(),
-					) {
-					if prev_asset_id != asset_id {
-						panic!("previous and new asset_id for location do not match");
-					}
-					location_stored = true;
-				}
+					)
+					.map(|prev_asset_id| {
+						if prev_asset_id != asset_id {
+							panic!("previous and new asset_id for location do not match");
+						}
+						true
+					})
+					.unwrap_or_default();
+
 				// check that new location is the same as old one for the same asset_id
-				let mut asset_stored = false;
-				if let Some(prev_location) =
+				let asset_stored =
 					<AssetsRegistry as RemoteAssetRegistryInspect>::asset_to_remote(asset_id)
-				{
-					if prev_location != foreign_location {
-						panic!("previous and new location for asset_id do not match");
-					}
-					asset_stored = true;
-				}
+						.map(|prev_location| {
+							if prev_location != foreign_location {
+								panic!("previous and new location for asset_id do not match");
+							}
+							true
+						})
+						.unwrap_or_default();
 				// check that either both maps or none map asset_id and location
 				if location_stored != asset_stored {
 					panic!("ForeignToLocal and LocalToForeign maps contradict each other");
@@ -165,86 +151,96 @@ pub mod hard_coded_assets {
 		fn on_runtime_upgrade() -> Weight {
 			let on_chain_version =
 				<AssetsRegistry as GetStorageVersion>::on_chain_storage_version();
-			if on_chain_version < 1 {
+			if on_chain_version < ASSETS_REGISTRY_V1 {
 				let assets = vec![
-					AssetCreationInput::new_asset(
-						CurrencyId(1),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"Picasso".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100_000_000_000,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(4),
-						Some(XcmAssetLocation(MultiLocation::parent())),
-						Some(
-							BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						37_500_000,
-						Some(rational!(375 / 1_000_000)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(105),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"KSM USDT LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"KSM_USDT_LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(106),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"PICA USDT LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PICA_USDT_LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(107),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"PICA KSM LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PICA_KSM_LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(129),
-						Some(XcmAssetLocation(MultiLocation {
+					AssetCreationInput {
+						asset_id: CurrencyId(1),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Picasso".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100_000_000_000,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(4),
+						location: Some(XcmAssetLocation(MultiLocation::parent())),
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 37_500_000,
+							ratio: Some(rational!(375 / 1_000_000)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(105),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"KSM USDT LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"KSM_USDT_LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(106),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"PICA USDT LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PICA_USDT_LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(107),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"PICA KSM LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PICA_KSM_LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(129),
+						location: Some(XcmAssetLocation(MultiLocation {
 							parents: 1,
 							interior: X2(
 								Parachain(topology::karura::ID),
@@ -254,21 +250,23 @@ pub mod hard_coded_assets {
 								)),
 							),
 						})),
-						Some(
-							BiBoundedAssetName::from_vec(b"Karura Dollar".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"kUSD".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100_000_000,
-						Some(rational!(15 / 1_000)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(130),
-						Some(XcmAssetLocation(MultiLocation {
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Karura Dollar".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"kUSD".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100_000_000,
+							ratio: Some(rational!(15 / 1_000)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(130),
+						location: Some(XcmAssetLocation(MultiLocation {
 							parents: 1,
 							interior: X3(
 								Parachain(topology::common_good_assets::ID),
@@ -276,45 +274,51 @@ pub mod hard_coded_assets {
 								GeneralIndex(topology::common_good_assets::USDT),
 							),
 						})),
-						Some(
-							BiBoundedAssetName::from_vec(b"Tether".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"USDT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(6),
-						100,
-						Some(rational!(15 / 1_000_000_000)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(5),
-						Some(XcmAssetLocation(MultiLocation {
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Tether".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"USDT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(6),
+							existential_deposit: 100,
+							ratio: Some(rational!(15 / 1_000_000_000)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(5),
+						location: Some(XcmAssetLocation(MultiLocation {
 							parents: 0,
 							interior: X1(GeneralIndex(5)),
 						})),
-						None,
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PBLO".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100_000_000_000,
-						Some(rational!(1 / 1)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(6),
-						None,
-						None,
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"ibcDOT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						214_300_000,
-						None,
-					),
+						asset_info: AssetInfo {
+							name: None,
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PBLO".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100_000_000_000,
+							ratio: Some(rational!(1 / 1)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(6),
+						location: None,
+						asset_info: AssetInfo {
+							name: None,
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"ibcDOT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 214_300_000,
+							ratio: None,
+						},
+					},
 				];
 
 				let total_weight = add_assets_to_storage(assets);
@@ -360,21 +364,23 @@ pub mod hard_coded_assets {
 
 			#[test]
 			fn should_migrate_local_asset() {
-				let assets = vec![AssetCreationInput::new_asset(
-					CurrencyId(1),
-					None,
-					Some(
-						BiBoundedAssetName::from_vec(b"Picasso".to_vec())
-							.expect("String is within bounds"),
-					),
-					Some(
-						BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
-							.expect("String is within bounds"),
-					),
-					Some(12),
-					100_000_000_000,
-					None,
-				)];
+				let assets = vec![AssetCreationInput {
+					asset_id: CurrencyId(1),
+					location: None,
+					asset_info: AssetInfo {
+						name: Some(
+							BiBoundedAssetName::from_vec(b"Picasso".to_vec())
+								.expect("String is within bounds"),
+						),
+						symbol: Some(
+							BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
+								.expect("String is within bounds"),
+						),
+						decimals: Some(12),
+						existential_deposit: 100_000_000_000,
+						ratio: None,
+					},
+				}];
 
 				new_test_ext().execute_with(|| {
 					add_assets_to_storage(assets);
@@ -386,21 +392,23 @@ pub mod hard_coded_assets {
 			}
 			#[test]
 			fn should_migrate_foreign_asset() {
-				let assets = vec![AssetCreationInput::new_asset(
-					CurrencyId(4),
-					Some(XcmAssetLocation(MultiLocation::parent())),
-					Some(
-						BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-							.expect("String is within bounds"),
-					),
-					Some(
-						BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-							.expect("String is within bounds"),
-					),
-					Some(12),
-					37_500_000,
-					Some(rational!(375 / 1_000_000)),
-				)];
+				let assets = vec![AssetCreationInput {
+					asset_id: CurrencyId(4),
+					location: Some(XcmAssetLocation(MultiLocation::parent())),
+					asset_info: AssetInfo {
+						name: Some(
+							BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+								.expect("String is within bounds"),
+						),
+						symbol: Some(
+							BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+								.expect("String is within bounds"),
+						),
+						decimals: Some(12),
+						existential_deposit: 37_500_000,
+						ratio: Some(rational!(375 / 1_000_000)),
+					},
+				}];
 
 				new_test_ext().execute_with(|| {
 					add_assets_to_storage(assets);
@@ -426,84 +434,94 @@ pub mod hard_coded_assets {
 			#[test]
 			fn should_migrate_all() {
 				let assets = vec![
-					AssetCreationInput::new_asset(
-						CurrencyId(1),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"Picasso".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100_000_000_000,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(4),
-						Some(XcmAssetLocation(MultiLocation::parent())),
-						Some(
-							BiBoundedAssetName::from_vec(b"Kusama".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						37_500_000,
-						Some(rational!(375 / 1_000_000)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(105),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"KSM USDT LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"KSM_USDT_LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(106),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"PICA USDT LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PICA_USDT_LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(107),
-						None,
-						Some(
-							BiBoundedAssetName::from_vec(b"PICA KSM LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PICA_KSM_LPT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100,
-						None,
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(129),
-						Some(XcmAssetLocation(MultiLocation {
+					AssetCreationInput {
+						asset_id: CurrencyId(1),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Picasso".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PICA".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100_000_000_000,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(4),
+						location: Some(XcmAssetLocation(MultiLocation::parent())),
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Kusama".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"KSM".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 37_500_000,
+							ratio: Some(rational!(375 / 1_000_000)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(105),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"KSM USDT LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"KSM_USDT_LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(106),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"PICA USDT LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PICA_USDT_LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(107),
+						location: None,
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"PICA KSM LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PICA_KSM_LPT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100,
+							ratio: None,
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(129),
+						location: Some(XcmAssetLocation(MultiLocation {
 							parents: 1,
 							interior: X2(
 								Parachain(topology::karura::ID),
@@ -513,21 +531,23 @@ pub mod hard_coded_assets {
 								)),
 							),
 						})),
-						Some(
-							BiBoundedAssetName::from_vec(b"Karura Dollar".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"kUSD".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100_000_000,
-						Some(rational!(15 / 1_000)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(130),
-						Some(XcmAssetLocation(MultiLocation {
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Karura Dollar".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"kUSD".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100_000_000,
+							ratio: Some(rational!(15 / 1_000)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(130),
+						location: Some(XcmAssetLocation(MultiLocation {
 							parents: 1,
 							interior: X3(
 								Parachain(topology::common_good_assets::ID),
@@ -535,45 +555,51 @@ pub mod hard_coded_assets {
 								GeneralIndex(topology::common_good_assets::USDT),
 							),
 						})),
-						Some(
-							BiBoundedAssetName::from_vec(b"Tether".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"USDT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(6),
-						100,
-						Some(rational!(15 / 1_000_000_000)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(5),
-						Some(XcmAssetLocation(MultiLocation {
+						asset_info: AssetInfo {
+							name: Some(
+								BiBoundedAssetName::from_vec(b"Tether".to_vec())
+									.expect("String is within bounds"),
+							),
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"USDT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(6),
+							existential_deposit: 100,
+							ratio: Some(rational!(15 / 1_000_000_000)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(5),
+						location: Some(XcmAssetLocation(MultiLocation {
 							parents: 0,
 							interior: X1(GeneralIndex(5)),
 						})),
-						None,
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"PBLO".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						100_000_000_000,
-						Some(rational!(1 / 1)),
-					),
-					AssetCreationInput::new_asset(
-						CurrencyId(6),
-						None,
-						None,
-						Some(
-							BiBoundedAssetSymbol::from_vec(b"ibcDOT".to_vec())
-								.expect("String is within bounds"),
-						),
-						Some(12),
-						214_300_000,
-						None,
-					),
+						asset_info: AssetInfo {
+							name: None,
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"PBLO".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 100_000_000_000,
+							ratio: Some(rational!(1 / 1)),
+						},
+					},
+					AssetCreationInput {
+						asset_id: CurrencyId(6),
+						location: None,
+						asset_info: AssetInfo {
+							name: None,
+							symbol: Some(
+								BiBoundedAssetSymbol::from_vec(b"ibcDOT".to_vec())
+									.expect("String is within bounds"),
+							),
+							decimals: Some(12),
+							existential_deposit: 214_300_000,
+							ratio: None,
+						},
+					},
 				];
 
 				new_test_ext().execute_with(|| {
