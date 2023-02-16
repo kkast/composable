@@ -25,9 +25,9 @@ fn minimum_balance() {
 			0
 		);
 
-		assert_eq!(<<Test as Config>::NativeTransactor>::minimum_balance(), 1);
-		assert_eq!(<<Test as Config>::LocalTransactor>::minimum_balance(asset_id_local), 0);
-		assert_eq!(<<Test as Config>::ForeignTransactor>::minimum_balance(asset_id_foreign), 0);
+		assert_eq!(NativeTransactor::minimum_balance(), 1);
+		assert_eq!(LocalTransactor::minimum_balance(asset_id_local), 0);
+		assert_eq!(ForeignTransactor::minimum_balance(asset_id_foreign), 0);
 	});
 }
 
@@ -50,15 +50,9 @@ fn total_issuance() {
 			ACCOUNT_FOREIGN_BALANCE
 		);
 
-		assert_eq!(<<Test as Config>::NativeTransactor>::total_issuance(), ACCOUNT_NATIVE_BALANCE);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::total_issuance(asset_id_local),
-			ACCOUNT_LOCAL_BALANCE
-		);
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::total_issuance(asset_id_foreign),
-			ACCOUNT_FOREIGN_BALANCE
-		);
+		assert_eq!(NativeTransactor::total_issuance(), ACCOUNT_NATIVE_BALANCE);
+		assert_eq!(LocalTransactor::total_issuance(asset_id_local), ACCOUNT_LOCAL_BALANCE);
+		assert_eq!(ForeignTransactor::total_issuance(asset_id_foreign), ACCOUNT_FOREIGN_BALANCE);
 	});
 }
 
@@ -91,19 +85,13 @@ fn total_balance() {
 			ACCOUNT_FOREIGN_BALANCE
 		);
 
+		assert_eq!(NativeTransactor::total_balance(&ACCOUNT_NATIVE), ACCOUNT_NATIVE_BALANCE);
 		assert_eq!(
-			<<Test as Config>::NativeTransactor>::total_balance(&ACCOUNT_NATIVE),
-			ACCOUNT_NATIVE_BALANCE
-		);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::total_balance(asset_id_local, &ACCOUNT_LOCAL),
+			LocalTransactor::total_balance(asset_id_local, &ACCOUNT_LOCAL),
 			ACCOUNT_LOCAL_BALANCE
 		);
 		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::total_balance(
-				asset_id_foreign,
-				&ACCOUNT_FOREIGN
-			),
+			ForeignTransactor::total_balance(asset_id_foreign, &ACCOUNT_FOREIGN),
 			ACCOUNT_FOREIGN_BALANCE
 		);
 	});
@@ -139,16 +127,13 @@ fn free_balance() {
 			ACCOUNT_FOREIGN_BALANCE
 		);
 
+		assert_eq!(NativeTransactor::free_balance(&ACCOUNT_NATIVE), ACCOUNT_NATIVE_BALANCE);
 		assert_eq!(
-			<<Test as Config>::NativeTransactor>::free_balance(&ACCOUNT_NATIVE),
-			ACCOUNT_NATIVE_BALANCE
-		);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::free_balance(asset_id_local, &ACCOUNT_LOCAL),
+			LocalTransactor::free_balance(asset_id_local, &ACCOUNT_LOCAL),
 			ACCOUNT_LOCAL_BALANCE
 		);
 		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::free_balance(asset_id_foreign, &ACCOUNT_FOREIGN),
+			ForeignTransactor::free_balance(asset_id_foreign, &ACCOUNT_FOREIGN),
 			ACCOUNT_FOREIGN_BALANCE
 		);
 	});
@@ -177,16 +162,9 @@ fn can_slash() {
 			ACCOUNT_FOREIGN_BALANCE
 		));
 
-		assert!(<<Test as Config>::NativeTransactor>::can_slash(
-			&ACCOUNT_NATIVE,
-			ACCOUNT_NATIVE_BALANCE
-		));
-		assert!(<<Test as Config>::LocalTransactor>::can_slash(
-			asset_id_local,
-			&ACCOUNT_LOCAL,
-			ACCOUNT_LOCAL_BALANCE
-		));
-		assert!(<<Test as Config>::ForeignTransactor>::can_slash(
+		assert!(NativeTransactor::can_slash(&ACCOUNT_NATIVE, ACCOUNT_NATIVE_BALANCE));
+		assert!(LocalTransactor::can_slash(asset_id_local, &ACCOUNT_LOCAL, ACCOUNT_LOCAL_BALANCE));
+		assert!(ForeignTransactor::can_slash(
 			asset_id_foreign,
 			&ACCOUNT_FOREIGN,
 			ACCOUNT_FOREIGN_BALANCE
@@ -218,16 +196,13 @@ fn can_reserve() {
 			ACCOUNT_FOREIGN_BALANCE
 		));
 
-		assert!(<<Test as Config>::NativeTransactor>::can_reserve(
-			&ACCOUNT_NATIVE,
-			ACCOUNT_NATIVE_BALANCE
-		));
-		assert!(<<Test as Config>::LocalTransactor>::can_reserve(
+		assert!(NativeTransactor::can_reserve(&ACCOUNT_NATIVE, ACCOUNT_NATIVE_BALANCE));
+		assert!(LocalTransactor::can_reserve(
 			asset_id_local,
 			&ACCOUNT_LOCAL,
 			ACCOUNT_LOCAL_BALANCE
 		));
-		assert!(<<Test as Config>::ForeignTransactor>::can_reserve(
+		assert!(ForeignTransactor::can_reserve(
 			asset_id_foreign,
 			&ACCOUNT_FOREIGN,
 			ACCOUNT_FOREIGN_BALANCE
@@ -282,16 +257,10 @@ fn reserve() {
 			ACCOUNT_FOREIGN_BALANCE
 		);
 
-		assert_eq!(<<Test as Config>::NativeTransactor>::reserved_balance(&ACCOUNT_NATIVE), 2500);
+		assert_eq!(NativeTransactor::reserved_balance(&ACCOUNT_NATIVE), 2500);
+		assert_eq!(LocalTransactor::reserved_balance(asset_id_local, &ACCOUNT_LOCAL), 900);
 		assert_eq!(
-			<<Test as Config>::LocalTransactor>::reserved_balance(asset_id_local, &ACCOUNT_LOCAL),
-			900
-		);
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::reserved_balance(
-				asset_id_foreign,
-				&ACCOUNT_FOREIGN
-			),
+			ForeignTransactor::reserved_balance(asset_id_foreign, &ACCOUNT_FOREIGN),
 			ACCOUNT_FOREIGN_BALANCE
 		);
 		<Pallet<Test> as MultiReservableCurrency<AccountId>>::unreserve(
@@ -331,18 +300,9 @@ fn reserve() {
 			500
 		);
 
-		assert_eq!(<<Test as Config>::NativeTransactor>::reserved_balance(&ACCOUNT_NATIVE), 1500);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::reserved_balance(asset_id_local, &ACCOUNT_LOCAL),
-			200
-		);
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::reserved_balance(
-				asset_id_foreign,
-				&ACCOUNT_FOREIGN
-			),
-			500
-		);
+		assert_eq!(NativeTransactor::reserved_balance(&ACCOUNT_NATIVE), 1500);
+		assert_eq!(LocalTransactor::reserved_balance(asset_id_local, &ACCOUNT_LOCAL), 200);
+		assert_eq!(ForeignTransactor::reserved_balance(asset_id_foreign, &ACCOUNT_FOREIGN), 500);
 	});
 }
 
@@ -400,27 +360,12 @@ fn repatriate_reserved() {
 			200,
 			orml_traits::BalanceStatus::Reserved
 		));
-		assert_eq!(<<Test as Config>::NativeTransactor>::reserved_balance(&ACCOUNT_NATIVE), 2200);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::reserved_balance(asset_id_local, &ACCOUNT_LOCAL),
-			800
-		);
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::reserved_balance(
-				asset_id_foreign,
-				&ACCOUNT_FOREIGN
-			),
-			1800
-		);
-		assert_eq!(<<Test as Config>::NativeTransactor>::reserved_balance(&ACCOUNT_TO), 300);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::reserved_balance(asset_id_local, &ACCOUNT_TO),
-			100
-		);
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::reserved_balance(asset_id_foreign, &ACCOUNT_TO),
-			200
-		);
+		assert_eq!(NativeTransactor::reserved_balance(&ACCOUNT_NATIVE), 2200);
+		assert_eq!(LocalTransactor::reserved_balance(asset_id_local, &ACCOUNT_LOCAL), 800);
+		assert_eq!(ForeignTransactor::reserved_balance(asset_id_foreign, &ACCOUNT_FOREIGN), 1800);
+		assert_eq!(NativeTransactor::reserved_balance(&ACCOUNT_TO), 300);
+		assert_eq!(LocalTransactor::reserved_balance(asset_id_local, &ACCOUNT_TO), 100);
+		assert_eq!(ForeignTransactor::reserved_balance(asset_id_foreign, &ACCOUNT_TO), 200);
 		// test repatriate to free
 		assert_ok!(<Pallet<Test> as MultiReservableCurrency<AccountId>>::repatriate_reserved(
 			NATIVE_ASSET_ID,
@@ -443,38 +388,17 @@ fn repatriate_reserved() {
 			200,
 			orml_traits::BalanceStatus::Free
 		));
-		assert_eq!(<<Test as Config>::NativeTransactor>::reserved_balance(&ACCOUNT_NATIVE), 1900);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::reserved_balance(asset_id_local, &ACCOUNT_LOCAL),
-			700
-		);
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::reserved_balance(
-				asset_id_foreign,
-				&ACCOUNT_FOREIGN
-			),
-			1600
-		);
+		assert_eq!(NativeTransactor::reserved_balance(&ACCOUNT_NATIVE), 1900);
+		assert_eq!(LocalTransactor::reserved_balance(asset_id_local, &ACCOUNT_LOCAL), 700);
+		assert_eq!(ForeignTransactor::reserved_balance(asset_id_foreign, &ACCOUNT_FOREIGN), 1600);
 		// initial 100 + 300 slashed
-		assert_eq!(<<Test as Config>::NativeTransactor>::free_balance(&ACCOUNT_TO), 400);
+		assert_eq!(NativeTransactor::free_balance(&ACCOUNT_TO), 400);
 		// initial 100 + 100 slashed
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::free_balance(asset_id_local, &ACCOUNT_TO),
-			200
-		);
+		assert_eq!(LocalTransactor::free_balance(asset_id_local, &ACCOUNT_TO), 200);
 		// initial 100 + 200 slashed
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::free_balance(asset_id_foreign, &ACCOUNT_TO),
-			300
-		);
-		assert_eq!(<<Test as Config>::NativeTransactor>::total_balance(&ACCOUNT_TO), 700);
-		assert_eq!(
-			<<Test as Config>::LocalTransactor>::total_balance(asset_id_local, &ACCOUNT_TO),
-			300
-		);
-		assert_eq!(
-			<<Test as Config>::ForeignTransactor>::total_balance(asset_id_foreign, &ACCOUNT_TO),
-			500
-		);
+		assert_eq!(ForeignTransactor::free_balance(asset_id_foreign, &ACCOUNT_TO), 300);
+		assert_eq!(NativeTransactor::total_balance(&ACCOUNT_TO), 700);
+		assert_eq!(LocalTransactor::total_balance(asset_id_local, &ACCOUNT_TO), 300);
+		assert_eq!(ForeignTransactor::total_balance(asset_id_foreign, &ACCOUNT_TO), 500);
 	});
 }
