@@ -11,21 +11,24 @@ routing tests
 */
 use crate::{
 	mocks::{AssetId, RuntimeOrigin, Test},
-	Pallet,
+	Config, Pallet,
 };
 use composable_traits::{
 	assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
 	xcm::assets::XcmAssetLocation,
 };
 
-pub const NATIVE_ASSET_ID: AssetId = 1;
+const NATIVE_ASSET_ID: AssetId = 1;
 const ACCOUNT_NATIVE: u128 = 1;
 const ACCOUNT_NATIVE_BALANCE: u128 = 3000;
 const ACCOUNT_LOCAL: u128 = 2;
 const ACCOUNT_LOCAL_BALANCE: u128 = 1000;
-pub const ACCOUNT_FOREIGN: u128 = 3;
+const ACCOUNT_FOREIGN: u128 = 3;
 const ACCOUNT_FOREIGN_BALANCE: u128 = 2000;
 const ACCOUNT_TO: u128 = 4;
+type LocalTransactor = <Test as Config>::LocalTransactor;
+type NativeTransactor = <Test as Config>::NativeTransactor;
+type ForeignTransactor = <Test as Config>::ForeignTransactor;
 
 // creates for routing 1 local asset and 1 foreign asset(native asset is specified in config)
 fn create_assets() -> (AssetId, AssetId) {
