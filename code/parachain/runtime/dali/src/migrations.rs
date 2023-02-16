@@ -30,6 +30,7 @@ pub mod hard_coded_assets {
 		currency::{AssetExistentialDepositInspect, Rational64},
 		rational,
 		storage::UpdateValue,
+		xcm::assets::RemoteAssetRegistryInspect,
 	};
 	use frame_support::{
 		traits::{GetStorageVersion, StorageVersion},
@@ -63,13 +64,13 @@ pub mod hard_coded_assets {
 	}
 
 	fn add_assets_to_storage(assets: Vec<AssetCreationInput>) -> Weight {
-		let (mut count_created, mut count_updated) = (0, 0);
-		for asset_input in assets {
-			let AssetCreationInput { asset_id, location, asset_info } = asset_input;
+		let mut count_created = 0;
+		let mut count_updated = 0;
+		for AssetCreationInput { asset_id, location, asset_info } in assets {
 			// check if there is data stored for foreign asset
 			if let Some(foreign_location) = location.clone() {
 				// check that new asset_id is the same as old one for the same location
-				let location_stored =
+				let is_location_stored =
 					<AssetsRegistry as RemoteAssetRegistryInspect>::location_to_asset(
 						foreign_location.clone(),
 					)
@@ -79,10 +80,10 @@ pub mod hard_coded_assets {
 						}
 						true
 					})
-					.unwrap_or_default();
+					.unwrap_or(false);
 
 				// check that new location is the same as old one for the same asset_id
-				let asset_stored =
+				let is_asset_stored =
 					<AssetsRegistry as RemoteAssetRegistryInspect>::asset_to_remote(asset_id)
 						.map(|prev_location| {
 							if prev_location != foreign_location {
@@ -90,12 +91,12 @@ pub mod hard_coded_assets {
 							}
 							true
 						})
-						.unwrap_or_default();
+						.unwrap_or(false);
 				// check that either both maps or none map asset_id and location
-				if location_stored != asset_stored {
+				if is_location_stored != is_asset_stored {
 					panic!("ForeignToLocal and LocalToForeign maps contradict each other");
 				}
-				if location_stored {
+				if is_location_stored {
 					<AssetsRegistry as RemoteAssetRegistryMutate>::update_asset(
 						asset_id,
 						asset_info_update(asset_info.clone()),
@@ -321,9 +322,8 @@ pub mod hard_coded_assets {
 					},
 				];
 
-				let total_weight = add_assets_to_storage(assets);
 				StorageVersion::new(1).put::<AssetsRegistry>();
-				total_weight
+				add_assets_to_storage(assets)
 			} else {
 				<Runtime as system::Config>::DbWeight::get().reads(1)
 			}
@@ -350,19 +350,6 @@ pub mod hard_coded_assets {
 			use super::*;
 
 			#[test]
-			fn storage_version() {
-				new_test_ext().execute_with(|| {
-					let on_chain_version =
-						<AssetsRegistry as GetStorageVersion>::on_chain_storage_version();
-					assert_eq!(on_chain_version, 0);
-					StorageVersion::new(1).put::<AssetsRegistry>();
-					let on_chain_version =
-						<AssetsRegistry as GetStorageVersion>::on_chain_storage_version();
-					assert_eq!(on_chain_version, 1)
-				})
-			}
-
-			#[test]
 			fn should_migrate_local_asset() {
 				let assets = vec![AssetCreationInput {
 					asset_id: CurrencyId(1),
@@ -383,11 +370,15 @@ pub mod hard_coded_assets {
 				}];
 
 				new_test_ext().execute_with(|| {
+					assert_eq!(
+						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(1)),
+						None
+					);
 					add_assets_to_storage(assets);
 					assert_eq!(
 						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(1)),
-						Some("Picasso".as_bytes().to_vec())
-					)
+						Some(b"Picasso".to_vec())
+					);
 				})
 			}
 			#[test]
@@ -414,7 +405,7 @@ pub mod hard_coded_assets {
 					add_assets_to_storage(assets);
 					assert_eq!(
 						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(4)),
-						Some("Kusama".as_bytes().to_vec())
+						Some(b"Kusama".to_vec())
 					);
 					assert_eq!(
 						<AssetsRegistry as RemoteAssetRegistryInspect>::location_to_asset(
@@ -603,55 +594,25 @@ pub mod hard_coded_assets {
 				];
 
 				new_test_ext().execute_with(|| {
-					add_assets_to_storage(assets);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(1)),
-						Some("Picasso".as_bytes().to_vec())
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(4)),
-						Some("Kusama".as_bytes().to_vec())
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(105)),
-						Some("KSM USDT LPT".as_bytes().to_vec())
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(106)),
-						Some("PICA USDT LPT".as_bytes().to_vec())
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(107)),
-						Some("PICA KSM LPT".as_bytes().to_vec())
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(129)),
-						Some("Karura Dollar".as_bytes().to_vec())
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(130)),
-						Some("Tether".as_bytes().to_vec())
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(5)),
-						None
-					);
-					assert_eq!(
-						<AssetsRegistry as InspectRegistryMetadata>::asset_name(&CurrencyId(6)),
-						None
-					);
-					assert_eq!(
-						<AssetsRegistry as AssetExistentialDepositInspect>::existential_deposit(
-							CurrencyId(5)
-						),
-						Ok(100_000_000_000)
-					);
-					assert_eq!(
-						<AssetsRegistry as AssetExistentialDepositInspect>::existential_deposit(
-							CurrencyId(6)
-						),
-						Ok(214_300_000)
-					);
+					add_assets_to_storage(assets.to_owned());
+					for AssetCreationInput { asset_id, location, asset_info } in assets {
+						assert_eq!(
+							<AssetsRegistry as InspectRegistryMetadata>::asset_name(&asset_id),
+							asset_info.name.map(|name| name.as_vec().to_owned())
+						);
+						assert_eq!(
+							<AssetsRegistry as AssetExistentialDepositInspect>::existential_deposit(
+								asset_id
+							),
+							Ok(asset_info.existential_deposit)
+						);
+						assert_eq!(
+							<AssetsRegistry as RemoteAssetRegistryInspect>::asset_to_remote(
+								asset_id
+							),
+							location
+						);
+					}
 				})
 			}
 		}
