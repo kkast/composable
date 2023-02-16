@@ -9,6 +9,7 @@ use composable_traits::{
 	assets::{AssetInfo, BiBoundedAssetName, BiBoundedAssetSymbol, CreateAsset},
 	xcm::assets::XcmAssetLocation,
 };
+use frame_support::traits::fungibles::{Inspect, InspectHold, MutateHold};
 
 const NATIVE_ASSET_ID: AssetId = 1;
 const ACCOUNT_NATIVE: u128 = 1;
@@ -90,7 +91,6 @@ fn mint_assets(asset_id_local: AssetId, asset_id_foreign: AssetId) {
 }
 
 mod route {
-	use frame_support::traits::fungibles::{InspectHold, MutateHold};
 
 	use super::*;
 
@@ -186,6 +186,30 @@ mod route_asset_type {
 	use frame_support::traits::WithdrawReasons;
 
 	use super::*;
+
+	#[test]
+	fn asset_exists() {
+		new_test_ext().execute_with(|| {
+			let (asset_id_local, asset_id_foreign) = create_assets();
+			const ASSET_NOT_EXIST: AssetId = 100;
+			// non native should not exist
+			assert!(!<Pallet<Test> as Inspect<AccountId>>::asset_exists(ASSET_NOT_EXIST));
+			assert!(<Pallet<Test> as Inspect<AccountId>>::asset_exists(NATIVE_ASSET_ID));
+			assert!(!<Pallet<Test> as Inspect<AccountId>>::asset_exists(asset_id_local));
+			assert!(!<Pallet<Test> as Inspect<AccountId>>::asset_exists(asset_id_foreign));
+			assert!(!LocalTransactor::asset_exists(asset_id_local));
+			assert!(!ForeignTransactor::asset_exists(asset_id_foreign));
+
+			mint_assets(asset_id_local, asset_id_foreign);
+			// all should exist except ASSET_NOT_EXIST
+			assert!(!<Pallet<Test> as Inspect<AccountId>>::asset_exists(ASSET_NOT_EXIST));
+			assert!(<Pallet<Test> as Inspect<AccountId>>::asset_exists(NATIVE_ASSET_ID));
+			assert!(<Pallet<Test> as Inspect<AccountId>>::asset_exists(asset_id_local));
+			assert!(<Pallet<Test> as Inspect<AccountId>>::asset_exists(asset_id_foreign));
+			assert!(LocalTransactor::asset_exists(asset_id_local));
+			assert!(ForeignTransactor::asset_exists(asset_id_foreign));
+		});
+	}
 
 	#[test]
 	fn ensure_can_withdraw() {
