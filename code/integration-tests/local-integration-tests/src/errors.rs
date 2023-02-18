@@ -4,13 +4,19 @@ use crate::{
 	prelude::*,
 };
 
-use common::Balance;
-use composable_traits::currency::AssetRatioInspect;
+use common::{fees::NativeBalance, Balance};
+use composable_traits::{
+	assets::AssetInfoUpdate, currency::AssetRatioInspect, storage::UpdateValue,
+};
 use orml_traits::MultiCurrency;
 use xcm::VersionedMultiAsset;
 
 /// under ED, but above Weight
-pub fn under_existential_deposit<AssetsRegistry: AssetRatioInspect<AssetId = CurrencyId>>(
+pub fn under_existential_deposit<
+	AssetsRegistry: AssetRatioInspect<AssetId = CurrencyId>
+		+ AssetExistentialDepositInspect<AssetId = CurrencyId, Balance = Balance>
+		+ BalanceConversion<NativeBalance, CurrencyId, Balance>,
+>(
 	asset_id: LocalAssetId,
 	_instruction_count: usize,
 ) -> Balance {
@@ -73,7 +79,7 @@ fn transfer_relay_native_to_non_existing_chain_by_local_id() {
 
 	This::execute_with(|| {
 		use this_runtime::*;
-		let _before = Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 		let transferred = XTokens::transfer(
 			RuntimeOrigin::signed(alice().into()),
 			CurrencyId::KSM,
@@ -103,7 +109,7 @@ fn transfer_non_existing_asset_by_local_id() {
 
 	This::execute_with(|| {
 		use this_runtime::*;
-		let _before = Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 		let transferred = XTokens::transfer(
 			RuntimeOrigin::signed(alice().into()),
 			CurrencyId(100500),
@@ -139,30 +145,50 @@ fn cannot_reserver_transfer_assets_when_fee_and_non_fee_has_different_origin() {
 		AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId(100500),
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		)
+		.unwrap();
+		AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
 				X2(Parachain(THIS_PARA_ID), GeneralIndex(100500)),
 			)),
-			Rational64::one(),
-			None,
 		)
 		.unwrap();
 		assert_ok!(Tokens::deposit(CurrencyId(100500), &alice().into(), 2 * transfer_amount));
-
 		AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId(123_666),
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		)
+		.unwrap();
+		AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
 				X2(Parachain(THIS_PARA_ID), GeneralIndex(123_666)),
 			)),
-			Rational64::one(),
-			None,
 		)
 		.unwrap();
+
 		assert_ok!(Tokens::deposit(CurrencyId(123_666), &alice().into(), 2 * transfer_amount));
 
-		let _before = Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 		let transferred = XTokens::transfer_multiasset_with_fee(
 			RuntimeOrigin::signed(alice().into()),
 			Box::new(VersionedMultiAsset::V1(MultiAsset {
@@ -210,18 +236,28 @@ fn transfer_existing_asset_but_with_relevant_outgoing_fee_by_local_id() {
 		AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId(100500),
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		)
+		.unwrap();
+		AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
 				X2(Parachain(THIS_PARA_ID), GeneralIndex(100500)),
 			)),
-			Rational64::one(),
-			None,
 		)
 		.unwrap();
 
 		assert_ok!(Tokens::deposit(CurrencyId(100500), &alice().into(), 2 * transfer_amount));
 
-		let _before = Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 		let transferred = XTokens::transfer(
 			RuntimeOrigin::signed(alice().into()),
 			CurrencyId(100500),
@@ -253,18 +289,28 @@ fn cannot_transfer_away_if_min_fee_is_not_defined() {
 
 	This::execute_with(|| {
 		use this_runtime::*;
-
 		AssetsRegistry::update_asset(
+			RawOrigin::Root.into(),
+			CurrencyId(100500),
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		)
+		.unwrap();
+		AssetsRegistry::update_asset_location(
 			RawOrigin::Root.into(),
 			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
 				X2(Parachain(SIBLING_PARA_ID), GeneralIndex(100500)),
 			)),
-			Rational64::one(),
-			None,
 		)
 		.unwrap();
+
 		assert_ok!(Tokens::deposit(CurrencyId(100500), &alice().into(), 2 * transfer_amount));
 
 		AssetsRegistry::set_min_fee(
@@ -280,7 +326,7 @@ fn cannot_transfer_away_if_min_fee_is_not_defined() {
 
 		assert_ok!(Tokens::deposit(CurrencyId::RELAY_NATIVE, &alice().into(), 2 * transfer_amount));
 
-		let _before = Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 		let transferred = XTokens::transfer_multicurrencies(
 			RuntimeOrigin::signed(alice().into()),
 			vec![
@@ -319,18 +365,28 @@ fn cannot_reserve_transfer_assets_from_self() {
 		AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId(100500),
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		)
+		.unwrap();
+		AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				0,
 				X2(Parachain(THIS_PARA_ID), GeneralIndex(100500)),
 			)),
-			Rational64::one(),
-			None,
 		)
 		.unwrap();
 
 		assert_ok!(Tokens::deposit(CurrencyId(100500), &alice().into(), 2 * transfer_amount));
 
-		let _before = Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 		let transferred = XTokens::transfer(
 			RuntimeOrigin::signed(alice().into()),
 			CurrencyId(100500),

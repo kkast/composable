@@ -74,6 +74,7 @@ oracle = { package = "pallet-oracle", path = "../../parachain/frame/oracle", def
 primitives = { path = "../../parachain/runtime/primitives", default-features = false }
 vault = { package = "pallet-vault", path = "../../parachain/frame/vault", default-features = false }
 transaction-payment = { package = "pallet-transaction-payment", path = "../../parachain/frame/transaction-payment", default-features = false }
+assets-transactor-router = { package = "pallet-assets-transactor-router", path = "../../parachain/frame/assets-transactor-router", default-features = false }
 
 # Used for the node template's RPCs
 system-rpc-runtime-api = { package = "frame-system-rpc-runtime-api", git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.36" }

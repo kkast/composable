@@ -1,6 +1,10 @@
 ///! tests that various assets integration scenarios work well
 use crate::{helpers::*, kusama_test_net::This, prelude::*};
-use composable_traits::xcm::assets::XcmAssetLocation;
+use composable_traits::{
+	assets::{AssetInfo, AssetInfoUpdate},
+	storage::UpdateValue,
+	xcm::assets::XcmAssetLocation,
+};
 
 use frame_system::RawOrigin;
 use primitives::currency::*;
@@ -14,17 +18,37 @@ fn updated_assets_registry_works_well_for_ratios() {
 		AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId(42),
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::from(10, 1))),
+			},
+		)
+		.unwrap();
+		AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId(42),
 			XcmAssetLocation(MultiLocation::new(1, X1(Parachain(666)))),
-			Rational64::from(10, 1),
-			None,
 		)
 		.unwrap();
 		AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId(123),
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::from(10, 100))),
+			},
+		)
+		.unwrap();
+		AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId(123),
 			XcmAssetLocation(MultiLocation::new(1, X1(Parachain(4321)))),
-			Rational64::from(10, 100),
-			None,
 		)
 		.unwrap();
 		assert_eq!(
@@ -45,9 +69,16 @@ fn registered_assets_with_smaller_than_native_price() {
 		use this_runtime::*;
 		AssetsRegistry::register_asset(
 			RawOrigin::Root.into(),
-			XcmAssetLocation(MultiLocation::new(1, X1(Parachain(666)))),
-			Rational64::from(10, 1),
-			None,
+			*b"lointest",
+			1_u64,
+			Some(XcmAssetLocation(MultiLocation::new(1, X1(Parachain(666))))),
+			AssetInfo {
+				name: None,
+				symbol: None,
+				decimals: None,
+				existential_deposit: 0,
+				ratio: Some(Rational64::from(10, 1)),
+			},
 		)
 		.unwrap();
 		let asset_id = System::events()
@@ -57,7 +88,7 @@ fn registered_assets_with_smaller_than_native_price() {
 					assets_registry::Event::<Runtime>::AssetRegistered {
 						asset_id,
 						location: _,
-						decimals: _,
+						asset_info: _,
 					},
 				) => Some(asset_id),
 				_ => None,
@@ -77,9 +108,16 @@ fn registered_assets_with_larger_than_native_price() {
 		use this_runtime::*;
 		AssetsRegistry::register_asset(
 			RawOrigin::Root.into(),
-			XcmAssetLocation(MultiLocation::new(1, X1(Parachain(666)))),
-			Rational64::from(10, 100),
-			None,
+			*b"lointest",
+			1_u64,
+			Some(XcmAssetLocation(MultiLocation::new(1, X1(Parachain(666))))),
+			AssetInfo {
+				name: None,
+				symbol: None,
+				decimals: None,
+				existential_deposit: 0,
+				ratio: Some(Rational64::from(10, 100)),
+			},
 		)
 		.unwrap();
 		let asset_id = System::events()
@@ -89,7 +127,7 @@ fn registered_assets_with_larger_than_native_price() {
 					assets_registry::Event::<Runtime>::AssetRegistered {
 						asset_id,
 						location: _,
-						decimals: _,
+						asset_info: _,
 					},
 				) => Some(asset_id),
 				_ => None,

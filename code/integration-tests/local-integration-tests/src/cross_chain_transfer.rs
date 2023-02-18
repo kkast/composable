@@ -6,7 +6,10 @@ use crate::{
 };
 use codec::Encode;
 use common::{AccountId, Balance};
-use composable_traits::{currency::RangeId, rational};
+use composable_traits::{
+	assets::{AssetInfo, AssetInfoUpdate, CreateAsset},
+	storage::UpdateValue,
+};
 
 use frame_system::RawOrigin;
 
@@ -50,8 +53,9 @@ fn reserve_transfer(from: [u8; 32], to: [u8; 32]) {
 	let to_account = &AccountId::from(to);
 	let balance = enough_weight();
 	let destination = THIS_PARA_ID;
-	let before =
-		This::execute_with(|| this_runtime::Assets::free_balance(CurrencyId::KSM, to_account));
+	let before = This::execute_with(|| {
+		this_runtime::AssetsTransactorRouter::free_balance(CurrencyId::KSM, to_account)
+	});
 	KusamaRelay::execute_with(|| {
 		use relay_runtime::*;
 		let _ = <Balances as frame_support::traits::Currency<_>>::deposit_creating(
@@ -69,7 +73,8 @@ fn reserve_transfer(from: [u8; 32], to: [u8; 32]) {
 	});
 
 	This::execute_with(|| {
-		let new_balance = this_runtime::Assets::free_balance(CurrencyId::KSM, to_account);
+		let new_balance =
+			this_runtime::AssetsTransactorRouter::free_balance(CurrencyId::KSM, to_account);
 		dump_events();
 		assert_eq_error_rate!(new_balance, before + balance, (UnitWeightCost::get() * 10) as u128);
 		assert!(!this_runtime::System::events()
@@ -88,12 +93,21 @@ fn transfer_this_native_to_sibling_overridden() {
 		assert_ok!(AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId::PICA,
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		));
+		assert_ok!(AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId::PICA,
 			composable_traits::xcm::assets::XcmAssetLocation(MultiLocation::new(
 				1,
 				X1(Parachain(THIS_PARA_ID),)
 			)),
-			rational!(1 / 1),
-			None,
 		));
 	});
 
@@ -124,8 +138,10 @@ fn transfer_this_native_to_sibling_overridden() {
 	});
 
 	Sibling::execute_with(|| {
-		let balance =
-			sibling_runtime::Assets::free_balance(CurrencyId::PICA, &AccountId::from(bob()));
+		let balance = sibling_runtime::AssetsTransactorRouter::free_balance(
+			CurrencyId::PICA,
+			&AccountId::from(bob()),
+		);
 		assert_eq_error_rate!(balance, 3 * PICA, (UnitWeightCost::get() * 10) as u128);
 	});
 }
@@ -138,20 +154,30 @@ fn transfer_non_native_reserve_asset_from_this_to_sibling() {
 		assert_ok!(this_runtime::AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId::PBLO,
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		));
+
+		assert_ok!(this_runtime::AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId::PBLO,
 			composable_traits::xcm::assets::XcmAssetLocation(MultiLocation::new(
 				1,
 				X2(Parachain(THIS_PARA_ID), GeneralIndex(CurrencyId::PBLO.into()),)
 			)),
-			Rational64::one(),
-			None,
 		));
 	});
 
 	This::execute_with(|| {
 		use this_runtime::*;
 
-		assert_ok!(Assets::deposit(CurrencyId::PBLO, &alice().into(), 10 * PICA));
-		let _before = Assets::free_balance(CurrencyId::PBLO, &alice().into());
+		assert_ok!(AssetsTransactorRouter::deposit(CurrencyId::PBLO, &alice().into(), 10 * PICA));
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::PBLO, &alice().into());
 		assert_ok!(RelayerXcm::limited_reserve_transfer_assets(
 			RuntimeOrigin::signed(alice().into()),
 			Box::new(VersionedMultiLocation::V1(MultiLocation::new(
@@ -164,13 +190,14 @@ fn transfer_non_native_reserve_asset_from_this_to_sibling() {
 			WeightLimit::Limited(399_600_000_000),
 		));
 
-		let after = Assets::free_balance(CurrencyId::PBLO, &alice().into());
+		let after = AssetsTransactorRouter::free_balance(CurrencyId::PBLO, &alice().into());
 		assert_eq!(after, 7 * PICA,);
 	});
 
 	Sibling::execute_with(|| {
 		use sibling_runtime::*;
-		let balance = Assets::free_balance(CurrencyId::PBLO, &AccountId::from(bob()));
+		let balance =
+			AssetsTransactorRouter::free_balance(CurrencyId::PBLO, &AccountId::from(bob()));
 		assert_eq_error_rate!(balance, 3 * PICA, (UnitWeightCost::get() * 10) as u128);
 	});
 }
@@ -183,12 +210,22 @@ fn transfer_non_native_reserve_asset_from_this_to_sibling_by_local_id_overridden
 		assert_ok!(this_runtime::AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			CurrencyId::PBLO,
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		));
+
+		assert_ok!(this_runtime::AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			CurrencyId::PBLO,
 			composable_traits::xcm::assets::XcmAssetLocation(MultiLocation::new(
 				1,
 				X2(Parachain(THIS_PARA_ID), GeneralIndex(CurrencyId::PBLO.into()),)
 			)),
-			Rational64::one(),
-			None,
 		));
 	});
 
@@ -196,7 +233,7 @@ fn transfer_non_native_reserve_asset_from_this_to_sibling_by_local_id_overridden
 		use this_runtime::*;
 
 		assert_ok!(Tokens::deposit(CurrencyId::PBLO, &alice().into(), 10 * PICA));
-		let _before = Assets::free_balance(CurrencyId::PBLO, &alice().into());
+		let _before = AssetsTransactorRouter::free_balance(CurrencyId::PBLO, &alice().into());
 
 		assert_ok!(XTokens::transfer(
 			RuntimeOrigin::signed(alice().into()),
@@ -215,13 +252,14 @@ fn transfer_non_native_reserve_asset_from_this_to_sibling_by_local_id_overridden
 			DEFAULT_SENDER_WEIGHT_LIMIT,
 		));
 
-		let after = Assets::free_balance(CurrencyId::PBLO, &alice().into());
+		let after = AssetsTransactorRouter::free_balance(CurrencyId::PBLO, &alice().into());
 		assert_eq!(after, 7 * PICA,);
 	});
 
 	Sibling::execute_with(|| {
 		use sibling_runtime::*;
-		let balance = Assets::free_balance(CurrencyId::PBLO, &AccountId::from(bob()));
+		let balance =
+			AssetsTransactorRouter::free_balance(CurrencyId::PBLO, &AccountId::from(bob()));
 		assert_eq_error_rate!(balance, 3 * PICA, (UnitWeightCost::get() * 10) as u128);
 	});
 }
@@ -235,8 +273,20 @@ fn this_native_transferred_from_sibling_to_native_is_not_enough() {
 		use sibling_runtime::*;
 		let root = frame_system::RawOrigin::Root;
 		let location = XcmAssetLocation::new(MultiLocation::new(1, X1(Parachain(THIS_PARA_ID))));
-		AssetsRegistry::register_asset(root.into(), location.clone(), Rational64::one(), None)
-			.unwrap();
+		AssetsRegistry::register_asset(
+			root.into(),
+			*b"lointest",
+			0_u64,
+			Some(location.clone()),
+			AssetInfo {
+				ratio: Some(Rational64::one()),
+				decimals: None,
+				name: None,
+				symbol: None,
+				existential_deposit: 0,
+			},
+		)
+		.unwrap();
 		System::events()
 			.iter()
 			.find_map(|x| match x.event {
@@ -778,8 +828,10 @@ fn trap_assets_larger_than_ed_works() {
 				7 * CurrencyId::unit::<Balance>(),
 			);
 
-		native_treasury_amount =
-			Assets::free_balance(CurrencyId::PICA, &this_runtime::TreasuryAccount::get());
+		native_treasury_amount = AssetsTransactorRouter::free_balance(
+			CurrencyId::PICA,
+			&this_runtime::TreasuryAccount::get(),
+		);
 	});
 
 	let assets: MultiAsset = (Parent, ksm_asset_amount).into();
@@ -800,10 +852,12 @@ fn trap_assets_larger_than_ed_works() {
 	});
 
 	This::execute_with(|| {
-		use this_runtime::*;
 		assert_eq!(
 			3 * CurrencyId::unit::<Balance>(),
-			Assets::free_balance(CurrencyId::KSM, &this_runtime::TreasuryAccount::get())
+			this_runtime::AssetsTransactorRouter::free_balance(
+				CurrencyId::KSM,
+				&this_runtime::TreasuryAccount::get()
+			)
 		);
 		log::error!("{:?}", &this_runtime::TreasuryAccount::get());
 		assert_eq!(
@@ -827,18 +881,21 @@ fn trap_assets_lower_than_existential_deposit_works() {
 		ParentIsPreset::<AccountId>::convert(Parent.into()).expect("Conversion into is safe; QED");
 
 	let (this_treasury_amount, other_treasury_amount) = This::execute_with(|| {
-		use this_runtime::*;
-		assert_ok!(Assets::deposit(any_asset, &parent_account, other_non_native_amount));
+		assert_ok!(this_runtime::AssetsTransactorRouter::deposit(
+			any_asset,
+			&parent_account,
+			other_non_native_amount
+		));
 		let _ = <this_runtime::Balances as frame_support::traits::Currency<AccountId>>::deposit_creating(
 			&parent_account,
 			some_native_amount,
 		);
 		(
-			<Assets as MultiCurrency<AccountId>>::free_balance(
+			<this_runtime::AssetsTransactorRouter as MultiCurrency<AccountId>>::free_balance(
 				this_native_asset,
 				&this_runtime::TreasuryAccount::get(),
 			),
-			<Assets as MultiCurrency<AccountId>>::free_balance(
+			<this_runtime::AssetsTransactorRouter as MultiCurrency<AccountId>>::free_balance(
 				any_asset,
 				&this_runtime::TreasuryAccount::get(),
 			),
@@ -878,7 +935,7 @@ fn trap_assets_lower_than_existential_deposit_works() {
 
 		assert_eq!(
 			some_native_amount,
-			<Assets as MultiCurrency<AccountId>>::free_balance(
+			<AssetsTransactorRouter as MultiCurrency<AccountId>>::free_balance(
 				this_native_asset,
 				&this_runtime::TreasuryAccount::get()
 			) - this_treasury_amount
@@ -886,7 +943,7 @@ fn trap_assets_lower_than_existential_deposit_works() {
 
 		assert_eq!(
 			other_non_native_amount,
-			<Assets as MultiCurrency<AccountId>>::free_balance(
+			<AssetsTransactorRouter as MultiCurrency<AccountId>>::free_balance(
 				any_asset,
 				&this_runtime::TreasuryAccount::get()
 			) - other_treasury_amount
@@ -907,7 +964,7 @@ fn sibling_trap_assets_works() {
 		let sibling_non_native_amount =
 			assert_above_deposit::<AssetsRegistry>(any_asset, 100_000_000_000);
 
-		assert_ok!(Assets::deposit(
+		assert_ok!(AssetsTransactorRouter::deposit(
 			any_asset,
 			&sibling_account(SIBLING_PARA_ID),
 			sibling_non_native_amount
@@ -933,9 +990,18 @@ fn sibling_trap_assets_works() {
 		assert_ok!(AssetsRegistry::update_asset(
 			RawOrigin::Root.into(),
 			any_asset,
-			remote,
-			Rational64::one(),
-			None
+			AssetInfoUpdate {
+				name: UpdateValue::Ignore,
+				symbol: UpdateValue::Ignore,
+				decimals: UpdateValue::Ignore,
+				existential_deposit: UpdateValue::Ignore,
+				ratio: UpdateValue::Set(Some(Rational64::one())),
+			},
+		));
+		assert_ok!(AssetsRegistry::update_asset_location(
+			RawOrigin::Root.into(),
+			any_asset,
+			remote
 		));
 		(balance, sibling_non_native_amount)
 	});
@@ -975,7 +1041,7 @@ fn sibling_trap_assets_works() {
 			None // non of assets trapped by hash, because all are known
 		);
 		assert_eq!(
-			Assets::free_balance(any_asset, &TreasuryAccount::get()),
+			AssetsTransactorRouter::free_balance(any_asset, &TreasuryAccount::get()),
 			sibling_non_native_amount
 		);
 
@@ -994,21 +1060,24 @@ fn sibling_shib_to_transfer() {
 	let sibling_asset_id = Sibling::execute_with(|| {
 		log::info!(target: "bdd", "Given SHIB on sibling registered");
 		use sibling_runtime::*;
-		let sibling_asset_id =
-			CurrencyFactory::create(RangeId::TOKENS).expect("Valid range and ED; QED");
-		let root = frame_system::RawOrigin::Root;
+		let sibling_index = 0_u64;
 		let location = XcmAssetLocation(MultiLocation::new(
 			1,
-			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_asset_id.into())),
+			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
-		AssetsRegistry::update_asset(
-			root.into(),
-			sibling_asset_id,
+		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
+			*b"lointest",
+			sibling_index,
+			AssetInfo {
+				name: None,
+				symbol: None,
+				decimals: Some(SHIB::EXPONENT),
+				existential_deposit: 0,
+				ratio: Some(Rational64::one()),
+			},
 			location,
-			Rational64::one(),
-			Some(SHIB::EXPONENT),
 		)
-		.expect("Asset already in Currency Factory; QED");
+		.expect("Should register asset");
 
 		log::info!(target: "bdd", "	and Bob has a lot SHIB on sibling");
 		let root = frame_system::RawOrigin::Root;
@@ -1026,18 +1095,24 @@ fn sibling_shib_to_transfer() {
 	let remote_sibling_asset_id = This::execute_with(|| {
 		log::info!(target: "bdd", "	and SHIB on Dali registered");
 		use this_runtime::*;
-		let root = frame_system::RawOrigin::Root;
+		let sibling_index = 1_u64;
 		let location = XcmAssetLocation(MultiLocation::new(
 			1,
-			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_asset_id.into())),
+			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
-		AssetsRegistry::register_asset(
-			root.into(),
+		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
+			*b"lointest",
+			sibling_index,
+			AssetInfo {
+				name: None,
+				symbol: None,
+				decimals: Some(SHIB::EXPONENT),
+				existential_deposit: 0,
+				ratio: Some(Rational64::one()),
+			},
 			location,
-			Rational64::one(),
-			Some(SHIB::EXPONENT),
 		)
-		.expect("Asset details are valid; QED");
+		.expect("Should register asset");
 		System::events()
 			.iter()
 			.find_map(|x| match x.event {
@@ -1045,7 +1120,7 @@ fn sibling_shib_to_transfer() {
 					assets_registry::Event::<Runtime>::AssetRegistered {
 						asset_id,
 						location: _,
-						decimals: _,
+						asset_info: _,
 					},
 				) => Some(asset_id),
 				_ => None,
@@ -1092,22 +1167,24 @@ fn transfer_unknown_token_from_known_origin_ends_up_in_unknown_tokens() {
 	let sibling_asset_id = Sibling::execute_with(|| {
 		use sibling_runtime::*;
 		log::info!(target: "bdd", "Given one well-known/registered/sufficient/payable Sibling chain asset");
-		let sibling_asset_id =
-			CurrencyFactory::create(RangeId::TOKENS).expect("Valid range and ED; QED");
-		let root = frame_system::RawOrigin::Root;
+		let sibling_index = 0_u64;
 		let location = XcmAssetLocation(MultiLocation::new(
 			1,
-			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_asset_id.into())),
+			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
-		AssetsRegistry::update_asset(
-			root.into(),
-			sibling_asset_id,
+		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
+			*b"lointest",
+			sibling_index,
+			AssetInfo {
+				name: None,
+				symbol: None,
+				decimals: Some(SHIB::EXPONENT),
+				existential_deposit: 0,
+				ratio: Some(Rational64::one()),
+			},
 			location,
-			Rational64::one(),
-			Some(SHIB::EXPONENT),
 		)
-		.expect("Asset already in Currency Factory; QED");
-
+		.expect("Should register asset");
 		let root = frame_system::RawOrigin::Root;
 		Tokens::set_balance(
 			root.into(),
@@ -1123,21 +1200,24 @@ fn transfer_unknown_token_from_known_origin_ends_up_in_unknown_tokens() {
 	let unknown_asset_id = Sibling::execute_with(|| {
 		use sibling_runtime::*;
 		log::info!(target: "bdd", "Given one not registered/nonpayable Sibling chain asset");
-		let sibling_asset_id =
-			CurrencyFactory::create(RangeId::TOKENS).expect("Valid range and ED; QED");
-		let root = frame_system::RawOrigin::Root;
+		let sibling_index = 1_u64;
 		let location = XcmAssetLocation(MultiLocation::new(
 			1,
-			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_asset_id.into())),
+			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
-		AssetsRegistry::update_asset(
-			root.into(),
-			sibling_asset_id,
+		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
+			*b"lointest",
+			sibling_index,
+			AssetInfo {
+				name: None,
+				symbol: None,
+				decimals: Some(SHIB::EXPONENT),
+				existential_deposit: 0,
+				ratio: Some(Rational64::one()),
+			},
 			location,
-			Rational64::one(),
-			Some(SHIB::EXPONENT),
 		)
-		.expect("Asset already in Currency Factory; QED");
+		.expect("Should register asset");
 
 		let root = frame_system::RawOrigin::Root;
 		Tokens::set_balance(
@@ -1153,16 +1233,22 @@ fn transfer_unknown_token_from_known_origin_ends_up_in_unknown_tokens() {
 
 	let remote_sibling_asset_id = This::execute_with(|| {
 		use this_runtime::*;
-		let root = frame_system::RawOrigin::Root;
 		let location = XcmAssetLocation(MultiLocation::new(
 			1,
 			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_asset_id.into())),
 		));
 		AssetsRegistry::register_asset(
-			root.into(),
-			location,
-			Rational64::one(),
-			Some(SHIB::EXPONENT),
+			RawOrigin::Root.into(),
+			*b"lointest",
+			1_u64,
+			Some(location),
+			AssetInfo {
+				name: None,
+				symbol: None,
+				decimals: Some(SHIB::EXPONENT),
+				existential_deposit: 0,
+				ratio: Some(Rational64::one()),
+			},
 		)
 		.expect("Asset details are valid; QED");
 		System::events()
@@ -1172,7 +1258,7 @@ fn transfer_unknown_token_from_known_origin_ends_up_in_unknown_tokens() {
 					assets_registry::Event::<Runtime>::AssetRegistered {
 						asset_id,
 						location: _,
-						decimals: _,
+						asset_info: _,
 					},
 				) => Some(asset_id),
 				_ => None,

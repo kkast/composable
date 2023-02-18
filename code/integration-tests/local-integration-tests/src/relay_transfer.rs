@@ -6,11 +6,9 @@ use crate::{
 };
 
 use common::AccountId;
-
 #[cfg(feature = "dali")]
 use frame_system::RawOrigin;
-
-use orml_traits::currency::MultiCurrency;
+use orml_traits::MultiCurrency;
 
 use frame_support::{assert_ok, log};
 
@@ -62,14 +60,20 @@ fn transfer_from_relay_native_from_this_to_relay_chain_raw() {
 
 	This::execute_with(|| {
 		use this_runtime::*;
-		let before = Assets::free_balance(CurrencyId::KSM, &this_runtime::TreasuryAccount::get());
+		let before = AssetsTransactorRouter::free_balance(
+			CurrencyId::KSM,
+			&this_runtime::TreasuryAccount::get(),
+		);
 		assert_gt!(before, transfer_amount);
 		let transferred =
 			RelayerXcm::execute(RawOrigin::Root.into(), Box::new(VersionedXcm::V2(message)), limit);
 
 		assert_ok!(transferred);
 
-		let after = Assets::free_balance(CurrencyId::KSM, &this_runtime::TreasuryAccount::get());
+		let after = AssetsTransactorRouter::free_balance(
+			CurrencyId::KSM,
+			&this_runtime::TreasuryAccount::get(),
+		);
 
 		assert_eq!(before - after, transfer_amount);
 	});
@@ -99,7 +103,8 @@ fn transfer_from_relay_native_from_this_to_relay_chain_by_local_id() {
 
 	log::info!(target: "bdd", "Alice transfers native from this to Relay");
 	This::execute_with(|| {
-		let before = this_runtime::Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let before =
+			this_runtime::AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 		let transferred = this_runtime::XTokens::transfer(
 			this_runtime::RuntimeOrigin::signed(alice().into()),
 			CurrencyId::KSM,
@@ -116,7 +121,8 @@ fn transfer_from_relay_native_from_this_to_relay_chain_by_local_id() {
 
 		assert_ok!(transferred);
 
-		let after = this_runtime::Assets::free_balance(CurrencyId::KSM, &alice().into());
+		let after =
+			this_runtime::AssetsTransactorRouter::free_balance(CurrencyId::KSM, &alice().into());
 
 		assert_eq!(before - after, transfer_amount);
 	});

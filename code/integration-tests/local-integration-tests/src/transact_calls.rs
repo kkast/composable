@@ -60,7 +60,7 @@ fn dex() {
 	let _this_native_treasury_amount = This::execute_with(|| {
 		let sibling_non_native_amount =
 			assert_above_deposit::<this_runtime::AssetsRegistry>(any_asset, 100_000_000_000);
-		assert_ok!(this_runtime::Assets::deposit(
+		assert_ok!(this_runtime::AssetsTransactorRouter::deposit(
 			any_asset,
 			&sibling_account(SIBLING_PARA_ID),
 			sibling_non_native_amount
@@ -72,10 +72,10 @@ fn dex() {
 			&sibling_account(SIBLING_PARA_ID),
 			this_liveness_native_amount * 1_000_000_000_000,
 		);
-		let _ = <assets::Pallet<this_runtime::Runtime> as MultiCurrency<AccountId>>::deposit(
-			CurrencyId::kUSD,
-			&sibling_account(SIBLING_PARA_ID),
-			this_liveness_native_amount,
+		let _ = <assets_transactor_router::Pallet<this_runtime::Runtime> as MultiCurrency<
+			AccountId,
+		>>::deposit(
+			CurrencyId::kUSD, &sibling_account(SIBLING_PARA_ID), this_liveness_native_amount
 		);
 		let _ =
 			<balances::Pallet<this_runtime::Runtime> as frame_support::traits::Currency<
