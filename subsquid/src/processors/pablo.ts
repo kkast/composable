@@ -45,17 +45,25 @@ interface PoolCreatedEvent {
 }
 
 async function getPoolCreatedEvent(event: PabloPoolCreatedEvent): Promise<PoolCreatedEvent> {
-  const { owner, poolId, assetWeights } = event.asV10005;
+  if (event.isV10005) {
+    const { owner, poolId, assetWeights } = event.asV10005;
+    // TODO: get lpTokenId from the event
+    // This is a temporary solution, and will be replaced by event data when runtime is upgraded
+    const lpTokenId = (105 + Number(poolId)).toString();
 
-  // TODO: get lpTokenId from the event
-  // This is a temporary solution, and will be replaced by event data when runtime is upgraded
-  const lpTokenId = (105 + Number(poolId)).toString();
-
+    return Promise.resolve({
+      owner,
+      poolId,
+      assetWeights,
+      lpTokenId
+    });
+  }
+  const { owner, poolId, assetWeights, lpTokenId } = event.asV10009;
   return Promise.resolve({
     owner,
     poolId,
     assetWeights,
-    lpTokenId
+    lpTokenId: lpTokenId.toString()
   });
 }
 
@@ -225,13 +233,23 @@ export async function processLiquidityAddedEvent(ctx: EventHandlerContext<Store,
     await getOrCreateHistoricalAssetPrice(ctx, assetId.toString(), ctx.block.timestamp);
   }
 
+  const amounts: Array<PabloAmount> = [];
+
+  for (const [assetId, amount] of assetAmounts) {
+    const price = await getOrCreateHistoricalAssetPrice(ctx, assetId.toString(), ctx.block.timestamp);
+    if (price) {
+      const pabloAmount = new PabloAmount({ assetId: assetId.toString(), amount, price });
+      amounts.push(pabloAmount);
+    }
+  }
+
   const pabloLiquidityAdded = new PabloLiquidityAdded({
     id: ctx.event.id,
     event,
     pool,
     timestamp: new Date(ctx.block.timestamp),
     blockId: ctx.block.hash,
-    amounts: assetAmounts.map(([assetId, amount]) => new PabloAmount({ assetId: assetId.toString(), amount }))
+    amounts
   });
 
   await ctx.store.save(pabloLiquidityAdded);
@@ -316,13 +334,23 @@ export async function processLiquidityRemovedEvent(ctx: EventHandlerContext<Stor
     await getOrCreateHistoricalAssetPrice(ctx, assetId.toString(), ctx.block.timestamp);
   }
 
+  const amounts: Array<PabloAmount> = [];
+
+  for (const [assetId, amount] of assetAmounts) {
+    const price = await getOrCreateHistoricalAssetPrice(ctx, assetId.toString(), ctx.block.timestamp);
+    if (price) {
+      const pabloAmount = new PabloAmount({ assetId: assetId.toString(), amount, price });
+      amounts.push(pabloAmount);
+    }
+  }
+
   const pabloLiquidityRemoved = new PabloLiquidityRemoved({
     id: ctx.event.id,
     event,
     pool,
     timestamp: new Date(ctx.block.timestamp),
     blockId: ctx.block.hash,
-    amounts: assetAmounts.map(([assetId, amount]) => new PabloAmount({ assetId: assetId.toString(), amount }))
+    amounts
   });
 
   await ctx.store.save(pabloLiquidityRemoved);
@@ -384,7 +412,7 @@ export async function processSwappedEvent(ctx: EventHandlerContext<Store, { even
   const quoteAsset = await getOrCreatePabloAsset(ctx, pool, quoteAssetId.toString());
 
   baseAsset.totalVolume += baseAmount;
-  baseAsset.totalLiquidity -= baseAmount;
+  baseAsset.totalLiquidity = baseAsset.totalLiquidity - baseAmount > 0n ? baseAsset.totalLiquidity - baseAmount : 0n;
   baseAsset.blockId = ctx.block.hash;
 
   await ctx.store.save(baseAsset);

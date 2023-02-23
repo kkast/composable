@@ -3,7 +3,7 @@ authors = ["Composable Developers"]
 edition = "2021"
 homepage = "https://composable.finance"
 name = "composable"
-version = "2.10005.0"
+version = "2.10009.0"
 
 [[bin]]
 name = "composable"
@@ -42,10 +42,7 @@ members = [
   "parachain/runtime/composable",
   "parachain/runtime/composable-wasm",
   "utils/common",
-  # FIXME(hussein): this package is outdated and broken
-  # "utils/price-feed",
-  "utils/collator-sidecar",
-  "utils/wasm-optimizer",
+  "utils/collator-sidecar",  
 ]
 resolver = "2"
 

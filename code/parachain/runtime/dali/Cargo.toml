@@ -82,7 +82,6 @@ dutch-auction = { package = "pallet-dutch-auction", path = "../../frame/dutch-au
 governance-registry = { package = "pallet-governance-registry", path = "../../frame/governance-registry", default-features = false }
 lending = { package = "pallet-lending", path = "../../frame/lending", default-features = false }
 liquidations = { package = "pallet-liquidations", path = "../../frame/liquidations", default-features = false }
-mosaic = { package = "pallet-mosaic", path = "../../frame/mosaic", default-features = false }
 oracle = { package = "pallet-oracle", path = "../../frame/oracle", default-features = false }
 pablo = { package = "pallet-pablo", path = "../../frame/pablo", default-features = false }
 pallet-fnft = { path = "../../frame/fnft", default-features = false }
@@ -181,7 +180,6 @@ runtime-benchmarks = [
   "lending/runtime-benchmarks",
   "liquidations/runtime-benchmarks",
   "membership/runtime-benchmarks",
-  "mosaic/runtime-benchmarks",
   "multisig/runtime-benchmarks",
   "oracle/runtime-benchmarks",
   "pablo/runtime-benchmarks",
@@ -199,7 +197,6 @@ runtime-benchmarks = [
   "xcm-builder/runtime-benchmarks",
   "bonded-finance/runtime-benchmarks",
   "dutch-auction/runtime-benchmarks",
-  "mosaic/runtime-benchmarks",
   "currency-factory/runtime-benchmarks",
   "liquidations/runtime-benchmarks",
   "lending/runtime-benchmarks",
@@ -248,7 +245,6 @@ std = [
   "lending-runtime-api/std",
   "liquidations/std",
   "membership/std",
-  "mosaic/std",
   "multisig/std",
   "oracle/std",
   "orml-tokens/std",
