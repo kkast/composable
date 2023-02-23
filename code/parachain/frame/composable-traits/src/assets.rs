@@ -164,14 +164,9 @@ pub trait CreateAsset {
 	/// If `Ok`, returns the ID of the newly created asset.
 	///
 	/// # Parameters
-	/// * `protocol_id` - The unique ID of the protocol that owns this asset (often a `PalletId`)
-	/// * `nonce` - A nonce controlled by the owning protocol that uniquely identifies the asset in
-	///   the scope of the protocol
 	/// * `foreign_asset_id` - Foreign asset ID or relative location
 	/// * `asset_info` - Structure containing relevant information to register the asset
 	fn create_foreign_asset(
-		protocol_id: [u8; 8],
-		nonce: u64,
 		asset_info: AssetInfo<Self::Balance>,
 		foreign_asset_id: Self::ForeignAssetId,
 	) -> Result<Self::LocalAssetId, DispatchError>;
@@ -198,8 +193,6 @@ impl<LocalAssetId: Default, ForeignAssetId, Balance> CreateAsset
 	}
 
 	fn create_foreign_asset(
-		_protocol_id: [u8; 8],
-		_nonce: u64,
 		_asset_info: AssetInfo<Self::Balance>,
 		_foreign_asset_id: Self::ForeignAssetId,
 	) -> Result<Self::LocalAssetId, DispatchError> {
@@ -210,5 +203,5 @@ impl<LocalAssetId: Default, ForeignAssetId, Balance> CreateAsset
 pub trait GenerateAssetId {
 	type AssetId;
 
-	fn generate_asset_id(protocol_id: [u8; 8], nonce: u64) -> Self::AssetId;
+	fn generate_asset_id(bytes: &[u8]) -> Self::AssetId;
 }

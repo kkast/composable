@@ -27,8 +27,6 @@ type ForeignTransactor = <Test as Config>::ForeignTransactor;
 fn create_assets() -> (AssetId, AssetId) {
 	let protocol_id_local = *b"testloca";
 	let nonce_local = 0;
-	let protocol_id_foreign = *b"testfore";
-	let nonce_foreign = 0;
 	let asset_info_local = AssetInfo {
 		name: Some(
 			BiBoundedAssetName::from_vec(b"local asset".to_vec()).expect("string is within bound"),
@@ -55,13 +53,8 @@ fn create_assets() -> (AssetId, AssetId) {
 		existential_deposit: 1000,
 	};
 
-	let asset_id_foreign = Pallet::<Test>::create_foreign_asset(
-		protocol_id_foreign,
-		nonce_foreign,
-		foreign_asset_info,
-		foreign_asset_id,
-	)
-	.unwrap();
+	let asset_id_foreign =
+		Pallet::<Test>::create_foreign_asset(foreign_asset_info, foreign_asset_id).unwrap();
 	(asset_id_local, asset_id_foreign)
 }
 

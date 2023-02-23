@@ -29,8 +29,6 @@ benchmarks! {
 	register_asset {
 		let location = T::ForeignAssetId::decode(&mut &XcmAssetLocation::RELAY_NATIVE.encode()[..])
 			.expect("Asset location is foreign ID");
-		let protocol_id = *b"benchmar";
-		let nonce = 1_u64;
 		let asset_info = AssetInfo {
 			name: Some(BiBoundedAssetName::from_vec(b"Kusama".to_vec()).expect("String is within bounds")),
 			symbol: Some(BiBoundedAssetSymbol::from_vec(b"KSM".to_vec()).expect("String is within bounds")),
@@ -38,39 +36,11 @@ benchmarks! {
 			existential_deposit: T::Balance::zero(),
 			ratio: Some(rational!(42 / 123)),
 		};
-	}: _(RawOrigin::Root, protocol_id, nonce, Some(location), asset_info)
-
-	update_asset_location {
-		let location = T::ForeignAssetId::decode(&mut &XcmAssetLocation::RELAY_NATIVE.encode()[..])
-			.expect("Asset location is foreign ID");
-		let protocol_id = *b"benchmar";
-		let nonce = 1_u64;
-		let asset_info = AssetInfo {
-			name: Some(BiBoundedAssetName::from_vec(b"Kusama".to_vec()).expect("String is within bounds")),
-			symbol: Some(BiBoundedAssetSymbol::from_vec(b"KSM".to_vec()).expect("String is within bounds")),
-			decimals: Some(3),
-			existential_deposit: T::Balance::zero(),
-			ratio: Some(rational!(42 / 123)),
-		};
-
-		AssetsRegistry::<T>::register_asset(
-			RawOrigin::Root.into(),
-			protocol_id,
-			nonce,
-			Some(location.clone()),
-			asset_info,
-		)
-		.expect("Asset details are non-duplicate and valid");
-
-		let local_asset_id = AssetsRegistry::<T>::from_foreign_asset(location.clone())
-			.expect("Asset exists");
-	}: _(RawOrigin::Root, local_asset_id, location)
+	}: _(RawOrigin::Root, location, asset_info)
 
 	update_asset {
 		let location = T::ForeignAssetId::decode(&mut &XcmAssetLocation::RELAY_NATIVE.encode()[..])
 			.expect("Asset location is foreign ID");
-		let protocol_id = *b"benchmar";
-		let nonce = 1_u64;
 		let asset_info = AssetInfo {
 			name: Some(BiBoundedAssetName::from_vec(b"Kusama".to_vec()).expect("String is within bounds")),
 			symbol: Some(BiBoundedAssetSymbol::from_vec(b"KSM".to_vec()).expect("String is within bounds")),
@@ -81,9 +51,7 @@ benchmarks! {
 
 		AssetsRegistry::<T>::register_asset(
 			RawOrigin::Root.into(),
-			protocol_id,
-			nonce,
-			Some(location.clone()),
+			location.clone(),
 			asset_info,
 		)
 		.expect("Asset details are non-duplicate and valid");

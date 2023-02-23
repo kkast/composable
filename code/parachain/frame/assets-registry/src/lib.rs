@@ -220,40 +220,25 @@ pub mod pallet {
 		#[pallet::weight(<T as Config>::WeightInfo::register_asset())]
 		pub fn register_asset(
 			origin: OriginFor<T>,
-			protocol_id: [u8; 8],
-			nonce: u64,
-			location: Option<T::ForeignAssetId>,
+			location: T::ForeignAssetId,
 			asset_info: AssetInfo<T::Balance>,
 		) -> DispatchResult {
 			T::UpdateAssetRegistryOrigin::ensure_origin(origin)?;
 
-			let asset_id = Self::generate_asset_id(protocol_id, nonce);
+			let asset_id = Self::generate_asset_id(&location.encode());
 
-			<Self as RemoteAssetRegistryMutate>::register_asset(asset_id, location, asset_info)?;
+			<Self as RemoteAssetRegistryMutate>::register_asset(
+				asset_id,
+				Some(location),
+				asset_info,
+			)?;
 			Ok(())
 		}
 
-		/// Update the location of a foreign asset.
-		///
-		/// Emits:
-		/// * `AssetLocationUpdated`
-		#[pallet::call_index(1)]
-		#[pallet::weight(<T as Config>::WeightInfo::update_asset_location())]
-		pub fn update_asset_location(
-			origin: OriginFor<T>,
-			asset_id: T::LocalAssetId,
-			location: T::ForeignAssetId,
-		) -> DispatchResultWithPostInfo {
-			T::UpdateAssetRegistryOrigin::ensure_origin(origin)?;
-			Self::set_reserve_location(asset_id, location)?;
-			Ok(().into())
-		}
-
-		/// Update stored asset information.
 		///
 		/// Emits:
 		/// * `AssetUpdated`
-		#[pallet::call_index(3)]
+		#[pallet::call_index(1)]
 		#[pallet::weight(<T as Config>::WeightInfo::update_asset())]
 		pub fn update_asset(
 			origin: OriginFor<T>,
@@ -273,7 +258,7 @@ pub mod pallet {
 		/// If None, than it is well known cannot pay with that asset on target_parachain_id.
 		/// If Some(0), than price can be anything greater or equal to zero.
 		/// If Some(MAX), than actually it forbids transfers.
-		#[pallet::call_index(4)]
+		#[pallet::call_index(2)]
 		#[pallet::weight(<T as Config>::WeightInfo::set_min_fee())]
 		pub fn set_min_fee(
 			origin: OriginFor<T>,
@@ -508,17 +493,8 @@ pub mod pallet {
 	impl<T: Config> GenerateAssetId for Pallet<T> {
 		type AssetId = T::LocalAssetId;
 
-		fn generate_asset_id(protocol_id: [u8; 8], nonce: u64) -> Self::AssetId {
-			// NOTE: Asset ID generation rational found here:
-			// https://github.com/PoisonPhang/composable-poison-fork/blob/INIT-13/rfcs/0013-redesign-assets-id-system.md#local-asset-id-generation
-			let bytes = protocol_id
-				.into_iter()
-				.chain(nonce.to_le_bytes())
-				.collect::<Vec<u8>>()
-				.try_into()
-				.expect("[u8; 8] + bytes(u64) = [u8; 16]");
-
-			Self::AssetId::from(u128::from_le_bytes(bytes))
+		fn generate_asset_id(bytes: &[u8]) -> Self::AssetId {
+			Self::AssetId::from(u128::from_be_bytes(sp_io::hashing::blake2_128(bytes)))
 		}
 	}
 }
