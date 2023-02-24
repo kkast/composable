@@ -4,11 +4,11 @@ use cumulus_primitives_core::ParaId;
 use primitives::currency::CurrencyId;
 use sp_runtime::traits::AccountIdConversion;
 
-use crate::{env_logger_init, kusama_test_net::KusamaRelay, prelude::*};
+use crate::{kusama_test_net::KusamaRelay, prelude::*};
 
 pub fn simtest() {
 	crate::kusama_test_net::KusamaNetwork::reset();
-	env_logger_init();
+	// env_logger_init();
 }
 
 /// create account ids from test para id

@@ -7,6 +7,7 @@ use crate::{
 use common::{fees::NativeBalance, Balance};
 use composable_traits::{
 	assets::AssetInfoUpdate, currency::AssetRatioInspect, storage::UpdateValue,
+	xcm::assets::RemoteAssetRegistryMutate,
 };
 use orml_traits::MultiCurrency;
 use xcm::VersionedMultiAsset;
@@ -154,8 +155,7 @@ fn cannot_reserver_transfer_assets_when_fee_and_non_fee_has_different_origin() {
 			},
 		)
 		.unwrap();
-		AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		AssetsRegistry::set_reserve_location(
 			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
@@ -176,8 +176,7 @@ fn cannot_reserver_transfer_assets_when_fee_and_non_fee_has_different_origin() {
 			},
 		)
 		.unwrap();
-		AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		AssetsRegistry::set_reserve_location(
 			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
@@ -245,8 +244,7 @@ fn transfer_existing_asset_but_with_relevant_outgoing_fee_by_local_id() {
 			},
 		)
 		.unwrap();
-		AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		AssetsRegistry::set_reserve_location(
 			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
@@ -301,8 +299,7 @@ fn cannot_transfer_away_if_min_fee_is_not_defined() {
 			},
 		)
 		.unwrap();
-		AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		AssetsRegistry::set_reserve_location(
 			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				1,
@@ -374,8 +371,7 @@ fn cannot_reserve_transfer_assets_from_self() {
 			},
 		)
 		.unwrap();
-		AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		AssetsRegistry::set_reserve_location(
 			CurrencyId(100500),
 			XcmAssetLocation(MultiLocation::new(
 				0,

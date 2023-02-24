@@ -9,6 +9,7 @@ use common::{AccountId, Balance};
 use composable_traits::{
 	assets::{AssetInfo, AssetInfoUpdate, CreateAsset},
 	storage::UpdateValue,
+	xcm::assets::RemoteAssetRegistryMutate,
 };
 
 use frame_system::RawOrigin;
@@ -101,8 +102,7 @@ fn transfer_this_native_to_sibling_overridden() {
 				ratio: UpdateValue::Set(Some(Rational64::one())),
 			},
 		));
-		assert_ok!(AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		assert_ok!(AssetsRegistry::set_reserve_location(
 			CurrencyId::PICA,
 			composable_traits::xcm::assets::XcmAssetLocation(MultiLocation::new(
 				1,
@@ -163,8 +163,7 @@ fn transfer_non_native_reserve_asset_from_this_to_sibling() {
 			},
 		));
 
-		assert_ok!(this_runtime::AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		assert_ok!(this_runtime::AssetsRegistry::set_reserve_location(
 			CurrencyId::PBLO,
 			composable_traits::xcm::assets::XcmAssetLocation(MultiLocation::new(
 				1,
@@ -219,8 +218,7 @@ fn transfer_non_native_reserve_asset_from_this_to_sibling_by_local_id_overridden
 			},
 		));
 
-		assert_ok!(this_runtime::AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
+		assert_ok!(this_runtime::AssetsRegistry::set_reserve_location(
 			CurrencyId::PBLO,
 			composable_traits::xcm::assets::XcmAssetLocation(MultiLocation::new(
 				1,
@@ -275,9 +273,7 @@ fn this_native_transferred_from_sibling_to_native_is_not_enough() {
 		let location = XcmAssetLocation::new(MultiLocation::new(1, X1(Parachain(THIS_PARA_ID))));
 		AssetsRegistry::register_asset(
 			root.into(),
-			*b"lointest",
-			0_u64,
-			Some(location.clone()),
+			location.clone(),
 			AssetInfo {
 				ratio: Some(Rational64::one()),
 				decimals: None,
@@ -998,11 +994,7 @@ fn sibling_trap_assets_works() {
 				ratio: UpdateValue::Set(Some(Rational64::one())),
 			},
 		));
-		assert_ok!(AssetsRegistry::update_asset_location(
-			RawOrigin::Root.into(),
-			any_asset,
-			remote
-		));
+		assert_ok!(AssetsRegistry::set_reserve_location(any_asset, remote));
 		(balance, sibling_non_native_amount)
 	});
 
@@ -1066,8 +1058,6 @@ fn sibling_shib_to_transfer() {
 			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
 		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
-			*b"lointest",
-			sibling_index,
 			AssetInfo {
 				name: None,
 				symbol: None,
@@ -1101,8 +1091,6 @@ fn sibling_shib_to_transfer() {
 			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
 		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
-			*b"lointest",
-			sibling_index,
 			AssetInfo {
 				name: None,
 				symbol: None,
@@ -1173,8 +1161,6 @@ fn transfer_unknown_token_from_known_origin_ends_up_in_unknown_tokens() {
 			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
 		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
-			*b"lointest",
-			sibling_index,
 			AssetInfo {
 				name: None,
 				symbol: None,
@@ -1206,8 +1192,6 @@ fn transfer_unknown_token_from_known_origin_ends_up_in_unknown_tokens() {
 			X2(Parachain(SIBLING_PARA_ID), GeneralIndex(sibling_index.into())),
 		));
 		let sibling_asset_id = AssetsTransactorRouter::create_foreign_asset(
-			*b"lointest",
-			sibling_index,
 			AssetInfo {
 				name: None,
 				symbol: None,
@@ -1239,9 +1223,7 @@ fn transfer_unknown_token_from_known_origin_ends_up_in_unknown_tokens() {
 		));
 		AssetsRegistry::register_asset(
 			RawOrigin::Root.into(),
-			*b"lointest",
-			1_u64,
-			Some(location),
+			location,
 			AssetInfo {
 				name: None,
 				symbol: None,

@@ -55,10 +55,12 @@ pub fn multi_existential_deposits<
 >(
 	currency_id: &CurrencyId,
 ) -> Balance {
-	AssetsRegistry::existential_deposit(*currency_id).unwrap_or_else(|_| {
+	let ret = AssetsRegistry::existential_deposit(*currency_id).unwrap_or_else(|_| {
 		AssetsRegistry::to_asset_balance(NATIVE_EXISTENTIAL_DEPOSIT, *currency_id)
 			.unwrap_or(Balance::MAX)
-	})
+	});
+	println!("\n\n\n currency_id {:?} ed {:?}", currency_id, ret);
+	ret
 }
 
 pub struct PriceConverter<AssetsRegistry, ForeignToNative>(
