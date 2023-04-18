@@ -14,11 +14,13 @@ pub struct Price<PriceValue, BlockNumber> {
 
 /// Statistics useful for oracle rewarding and tracking.
 #[derive(Encode, Decode, MaxEncodedLen, Default, Debug, PartialEq, Eq, TypeInfo, Clone)]
-pub struct RewardTracker<Balance, Timestamp> {
+pub struct RewardTracker<Balance, Timestamp, BlockNumber> {
 	/// Period which rewarding resets. Most likely a year.
 	pub period: Timestamp,
 	/// Start of the current rewarding period.
 	pub start: Timestamp,
+	/// Start block
+	pub start_block: BlockNumber,
 	/// Total already rewarded during the current rewarding period.
 	pub total_already_rewarded: Balance,
 	/// Pre-calculated current reward rate per block.
