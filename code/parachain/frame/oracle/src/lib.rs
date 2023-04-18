@@ -982,9 +982,7 @@ pub mod pallet {
 							"block sum {:?}",
 							bn + T::StalePrice::get() + T::PriceDelayDelta::get()
 						);
-						if bn + T::StalePrice::get() + T::PriceDelayDelta::get() < current_block &&
-							Self::is_requested(&asset_id)
-						{
+						if bn + T::StalePrice::get() + T::PriceDelayDelta::get() < current_block {
 							Self::slash(asset_id, oracle_id, asset_info.inactivity_slash);
 						}
 					}
