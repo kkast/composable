@@ -154,6 +154,8 @@ pub mod pallet {
 		type StakeLock: Get<Self::BlockNumber>;
 		/// Blocks until price is considered stale
 		type StalePrice: Get<Self::BlockNumber>;
+		/// price submission possible delay delta
+		type PriceDelayDelta: Get<Self::BlockNumber>;
 		/// Origin to add new price types
 		type AddOracle: EnsureOrigin<Self::RuntimeOrigin>;
 		/// Origin to manage rewards
@@ -220,6 +222,7 @@ pub mod pallet {
 		/// Reward allocation weight for this asset type out of the total block reward.
 		pub reward_weight: Balance,
 		pub slash: Balance,
+		pub inactivity_slash: Balance,
 		pub emit_price_changes: bool,
 	}
 
@@ -242,7 +245,7 @@ pub mod pallet {
 	#[allow(clippy::disallowed_types)]
 	/// Rewarding history for Oracles. Used for calculating the current block reward.
 	pub type RewardTrackerStore<T: Config> =
-		StorageValue<_, RewardTracker<BalanceOf<T>, T::Moment>, OptionQuery>;
+		StorageValue<_, RewardTracker<BalanceOf<T>, T::Moment, T::BlockNumber>, OptionQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn signer_to_controller)]
@@ -272,6 +275,18 @@ pub mod pallet {
 	/// Mapping of signing key to stake
 	pub type AccumulatedRewardsPerAsset<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AssetId, BalanceOf<T>>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn last_price_submission)]
+	/// Mapping of signing key to stake
+	pub type LastPriceSubmission<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		T::AssetId,
+		Blake2_128Concat,
+		T::AccountId,
+		T::BlockNumber,
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn answer_in_transit)]
@@ -334,7 +349,16 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Asset info created or changed. \[asset_id, threshold, min_answers, max_answers,
 		/// block_interval, reward, slash\]
-		AssetInfoChange(T::AssetId, Percent, u32, u32, T::BlockNumber, BalanceOf<T>, BalanceOf<T>),
+		AssetInfoChange(
+			T::AssetId,
+			Percent,
+			u32,
+			u32,
+			T::BlockNumber,
+			BalanceOf<T>,
+			BalanceOf<T>,
+			BalanceOf<T>,
+		),
 		/// Signer was set. \[signer, controller\]
 		SignerSet(T::AccountId, T::AccountId),
 		/// Stake was added. \[added_by, amount_added, total_amount\]
@@ -523,6 +547,7 @@ pub mod pallet {
 		/// - `block_interval`: blocks until oracle triggered
 		/// - `reward`: reward amount for correct answer
 		/// - `slash`: slash amount for bad answer
+		/// - `inactivity_slash`: slash amount for not submitting price for too long
 		/// - `emit_price_changes`: emit PriceChanged event when asset price changes
 		///
 		/// Emits `DepositEvent` event when successful.
@@ -537,6 +562,7 @@ pub mod pallet {
 			block_interval: Validated<T::BlockNumber, ValidBlockInterval<T::StalePrice>>,
 			reward_weight: BalanceOf<T>,
 			slash: BalanceOf<T>,
+			inactivity_slash: BalanceOf<T>,
 			emit_price_changes: bool,
 		) -> DispatchResultWithPostInfo {
 			T::AddOracle::ensure_origin(origin)?;
@@ -555,6 +581,7 @@ pub mod pallet {
 				block_interval: *block_interval,
 				reward_weight,
 				slash,
+				inactivity_slash,
 				emit_price_changes,
 			};
 			// track reward total weight for all assets
@@ -578,6 +605,7 @@ pub mod pallet {
 				*block_interval,
 				reward_weight,
 				slash,
+				inactivity_slash,
 			));
 			Ok(().into())
 		}
@@ -629,6 +657,7 @@ pub mod pallet {
 			if reward_tracker.start == Zero::zero() {
 				reward_tracker.start = now;
 				reward_tracker.period = period;
+				reward_tracker.start_block = frame_system::Pallet::<T>::block_number();
 			}
 			// calculate the current block reward by dividing the total possible reward by the
 			// remaining number of blocks in the year.
@@ -763,6 +792,8 @@ pub mod pallet {
 					Some(transit.unwrap_or_else(Zero::zero).saturating_add(asset_info.slash));
 			});
 
+			let current_block = frame_system::Pallet::<T>::block_number();
+			LastPriceSubmission::<T>::insert(asset_id, &who, current_block);
 			Self::deposit_event(Event::PriceSubmitted(who, asset_id, price));
 			Ok(Pays::No.into())
 		}
@@ -800,6 +831,29 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn slash(asset_id: T::AssetId, who: T::AccountId, slash_amount: BalanceOf<T>) {
+			let new_amount_staked = Self::oracle_stake(who.clone())
+				.unwrap_or_else(|| 0_u32.into())
+				.saturating_sub(slash_amount);
+			OracleStake::<T>::insert(&who, new_amount_staked);
+			let result = T::Currency::repatriate_reserved(
+				&who,
+				&T::TreasuryAccount::get(),
+				slash_amount,
+				BalanceStatus::Free,
+			);
+			match result {
+				Ok(remaining_val) =>
+					if remaining_val > BalanceOf::<T>::zero() {
+						log::warn!("Only slashed {:?}", slash_amount - remaining_val);
+					},
+				Err(e) => {
+					log::warn!("Failed to slash {:?} due to {:?}", who, e);
+				},
+			}
+			Self::deposit_event(Event::UserSlashed(who.clone(), asset_id, slash_amount));
+		}
+
 		pub fn handle_payout(
 			pre_prices: &[PrePrice<T::PriceValue, T::BlockNumber, T::AccountId>],
 			price: T::PriceValue,
@@ -818,31 +872,7 @@ pub mod pallet {
 				};
 				let min_accuracy = asset_info.threshold;
 				if accuracy < min_accuracy {
-					let slash_amount = asset_info.slash;
-					let new_amount_staked = Self::oracle_stake(answer.who.clone())
-						.unwrap_or_else(|| 0_u32.into())
-						.saturating_sub(slash_amount);
-					OracleStake::<T>::insert(&answer.who, new_amount_staked);
-					let result = T::Currency::repatriate_reserved(
-						&answer.who,
-						&T::TreasuryAccount::get(),
-						slash_amount,
-						BalanceStatus::Free,
-					);
-					match result {
-						Ok(remaining_val) =>
-							if remaining_val > BalanceOf::<T>::zero() {
-								log::warn!("Only slashed {:?}", slash_amount - remaining_val);
-							},
-						Err(e) => {
-							log::warn!("Failed to slash {:?} due to {:?}", answer.who, e);
-						},
-					}
-					Self::deposit_event(Event::UserSlashed(
-						answer.who.clone(),
-						asset_id,
-						slash_amount,
-					));
+					Self::slash(asset_id, answer.who.clone(), asset_info.slash);
 				} else {
 					let controller = SignerToController::<T>::get(&answer.who)
 						.unwrap_or_else(|| answer.who.clone());
@@ -892,8 +922,13 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn get_reward_tracker_if_enabled(
-		) -> Option<RewardTracker<<T as Config>::Balance, <T as Config>::Moment>> {
+		fn get_reward_tracker_if_enabled() -> Option<
+			RewardTracker<
+				<T as Config>::Balance,
+				<T as Config>::Moment,
+				<T as frame_system::Config>::BlockNumber,
+			>,
+		> {
 			RewardTrackerStore::<T>::get().and_then(|r| {
 				if r.start != Zero::zero() {
 					Some(r)
@@ -923,6 +958,7 @@ pub mod pallet {
 					{
 						reward_tracker.start = now;
 						reward_tracker.total_already_rewarded = Zero::zero();
+						reward_tracker.start_block = frame_system::Pallet::<T>::block_number();
 					}
 				},
 				None => {},
@@ -938,6 +974,20 @@ pub mod pallet {
 			for (asset_id, asset_info) in AssetsInfo::<T>::iter() {
 				// accumulate rewards
 				if let Some(reward_tracker) = reward_tracker_option.clone() {
+					let current_block = frame_system::Pallet::<T>::block_number();
+					for (oracle_id, balance) in OracleStake::<T>::iter() {
+						let bn = LastPriceSubmission::<T>::get(asset_id, &oracle_id)
+							.unwrap_or(reward_tracker.start_block);
+						println!(
+							"block sum {:?}",
+							bn + T::StalePrice::get() + T::PriceDelayDelta::get()
+						);
+						if bn + T::StalePrice::get() + T::PriceDelayDelta::get() < current_block &&
+							Self::is_requested(&asset_id)
+						{
+							Self::slash(asset_id, oracle_id, asset_info.inactivity_slash);
+						}
+					}
 					if let Ok(reward_amount_per_asset) = safe_multiply_by_rational(
 						reward_tracker.current_block_reward.unique_saturated_into(),
 						asset_info.reward_weight.unique_saturated_into(),
