@@ -74,6 +74,16 @@ impl<T: frame_system::Config> oracle::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().writes(2))
 	}
 	// Storage: Oracle ControllerToSigner (r:1 w:1)
+	// Storage: Oracle OracleStake (r:1 w:1)
+	// Storage: Oracle DeclaredWithdraws (r:0 w:1)
+	// Storage: Oracle SignerToController (r:0 w:1)
+	fn remove_signer() -> Weight {
+		// Minimum execution time: 39_362 nanoseconds.
+		Weight::from_ref_time(40_267_000)
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(4))
+	}
+	// Storage: Oracle ControllerToSigner (r:1 w:1)
 	// Storage: Oracle DeclaredWithdraws (r:1 w:1)
 	// Storage: System Account (r:1 w:0)
 	// Storage: Oracle SignerToController (r:0 w:1)
