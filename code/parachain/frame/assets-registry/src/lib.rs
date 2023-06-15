@@ -295,19 +295,9 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			asset_id: T::LocalAssetId,
 			location: Option<T::ForeignAssetId>,
-		) -> DispatchResultWithPostInfo {
+		) -> DispatchResult {
 			T::UpdateAssetRegistryOrigin::ensure_origin(origin)?;
-			ensure!(ExistentialDeposit::<T>::contains_key(asset_id), Error::<T>::AssetNotFound);
-			if let Some(inner_location) = location {
-				Self::set_reserve_location(asset_id, inner_location)?;
-			} else {
-				let old_location = LocalToForeign::<T>::try_get(asset_id)
-					.map_err(|_| Error::<T>::AssetLocationIsNone)?;
-				ForeignToLocal::<T>::remove(old_location);
-				LocalToForeign::<T>::remove(asset_id);
-				Self::deposit_event(Event::AssetLocationRemoved { asset_id });
-			}
-			Ok(().into())
+			<Self as RemoteAssetRegistryMutate>::set_location(asset_id, location)
 		}
 	}
 
@@ -326,6 +316,21 @@ pub mod pallet {
 					Asset { name, id: asset_id, decimals, ratio, foreign_id, existential_deposit }
 				})
 				.collect::<Vec<_>>()
+		}
+
+		fn set_reserve_location(
+			asset_id: T::LocalAssetId,
+			location: T::ForeignAssetId,
+		) -> DispatchResult {
+			ensure!(!ForeignToLocal::<T>::contains_key(&location), Error::<T>::LocationIsUsed);
+			let old_location = LocalToForeign::<T>::try_get(asset_id);
+			if let Ok(inner_old_location) = old_location {
+				ForeignToLocal::<T>::remove(inner_old_location);
+			}
+			ForeignToLocal::<T>::insert(&location, asset_id);
+			LocalToForeign::<T>::insert(asset_id, location.clone());
+			Self::deposit_event(Event::AssetLocationUpdated { asset_id, location });
+			Ok(())
 		}
 	}
 
@@ -361,21 +366,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn set_reserve_location(
-			asset_id: Self::AssetId,
-			location: Self::AssetNativeLocation,
-		) -> DispatchResult {
-			ensure!(!ForeignToLocal::<T>::contains_key(&location), Error::<T>::LocationIsUsed);
-			let old_location = LocalToForeign::<T>::try_get(asset_id);
-			if let Ok(inner_old_location) = old_location {
-				ForeignToLocal::<T>::remove(inner_old_location);
-			}
-			ForeignToLocal::<T>::insert(&location, asset_id);
-			LocalToForeign::<T>::insert(asset_id, location.clone());
-			Self::deposit_event(Event::AssetLocationUpdated { asset_id, location });
-			Ok(())
-		}
-
 		fn update_asset(
 			asset_id: Self::AssetId,
 			asset_info: AssetInfoUpdate<Self::Balance>,
@@ -401,6 +391,23 @@ pub mod pallet {
 
 			Self::deposit_event(Event::AssetUpdated { asset_id, asset_info });
 
+			Ok(())
+		}
+
+		fn set_location(
+			asset_id: Self::AssetId,
+			location: Option<Self::AssetNativeLocation>,
+		) -> DispatchResult {
+			ensure!(ExistentialDeposit::<T>::contains_key(asset_id), Error::<T>::AssetNotFound);
+			if let Some(inner_location) = location {
+				Self::set_reserve_location(asset_id, inner_location)?;
+			} else {
+				let old_location = LocalToForeign::<T>::try_get(asset_id)
+					.map_err(|_| Error::<T>::AssetLocationIsNone)?;
+				ForeignToLocal::<T>::remove(old_location);
+				LocalToForeign::<T>::remove(asset_id);
+				Self::deposit_event(Event::AssetLocationRemoved { asset_id });
+			}
 			Ok(())
 		}
 	}

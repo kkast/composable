@@ -64,23 +64,9 @@ pub trait RemoteAssetRegistryMutate {
 		asset_info: AssetInfoUpdate<Self::Balance>,
 	) -> DispatchResult;
 
-	/// Set asset native location.
-	///
-	/// Adds mapping between native location and local asset id and vice versa.
-	/// It is assumed that it is possible to use origin as chain who holds reserve of tokens.
-	///
-	/// Inputs:
-	/// `asset_id` local asset id created using `CurrencyFactory`
-	/// `location` - remote location
-	/// `ed` - minimal amount of registered asset allowed to form account
-	/// `ratio` - of native asset to remote; amount of foreign asset multiplied by ratio will give
-	/// equivalent amount of native; `decimals` - if asset decimals is not 12, than value must be
-	/// provided Emits `LocationSet` event when successful.
-	/// `asset_id` - local asset id create via `CurrencyFactory`
-	/// `location` - remote location relative to this chain
-	fn set_reserve_location(
+	fn set_location(
 		asset_id: Self::AssetId,
-		location: Self::AssetNativeLocation,
+		location: Option<Self::AssetNativeLocation>,
 	) -> DispatchResult;
 }
 
