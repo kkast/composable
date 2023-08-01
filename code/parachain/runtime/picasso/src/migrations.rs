@@ -524,6 +524,15 @@ pub mod migrate_asset_ids {
 			}
 
 			#[test]
+			fn print_staking_address() {
+				new_test_ext().execute_with(|| {
+					println!("Staking address {}", farming::Pallet::<Runtime>::pool_account_id(&CurrencyId(1088357900348863545348)));
+					println!("Treasury address {}", <Runtime as farming::Config>::TreasuryAccountId::get());
+					println!("oracle address {:?}", <Runtime as oracle::Config>::PalletId::get().0);
+				})
+			}
+
+			#[test]
 			fn migrate_composable_denoms_test() {
 				new_test_ext().execute_with(|| {
 					let location = ForeignAssetId::IbcIcs20(PrefixedDenom::from_str("transfer/channel-15/6").expect("should work"));
